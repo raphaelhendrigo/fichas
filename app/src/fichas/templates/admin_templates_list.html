@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">Templates</h1>
+  <a class="btn-primary" href="/admin/templates/novo">Novo template</a>
+</div>
+
+<div class="mt-6 card overflow-hidden">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50 text-left">
+      <tr>
+        <th class="px-4 py-3">Nome</th>
+        <th class="px-4 py-3">Descricao</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 bg-white">
+      {% for template in templates_list %}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{ template.nome }}</td>
+        <td class="px-4 py-3">{{ template.descricao or '-' }}</td>
+        <td class="px-4 py-3 text-right">
+          <a class="btn-secondary" href="/admin/templates/{{ template.id }}/editar">Editar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

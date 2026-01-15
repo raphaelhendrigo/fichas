@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% set is_edit = template is not none %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">{{ 'Editar template' if is_edit else 'Novo template' }}</h1>
+  <a class="btn-secondary" href="/admin/templates">Voltar</a>
+</div>
+
+<form class="mt-6 space-y-4" method="post">
+  <div>
+    <label class="text-sm font-medium">Nome</label>
+    <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="nome" value="{{ form.nome or template.nome if template else form.nome or '' }}" />
+    {% if errors and errors.get('nome') %}
+    <p class="text-sm text-red-600">{{ errors.get('nome') }}</p>
+    {% endif %}
+  </div>
+  <div>
+    <label class="text-sm font-medium">Descricao</label>
+    <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="descricao" value="{{ form.descricao or template.descricao if template else form.descricao or '' }}" />
+  </div>
+  <div>
+    <label class="text-sm font-medium">Schema JSON</label>
+    <textarea class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm" name="schema_text" rows="10">{{ form.schema_text or (template.schema_json | tojson(indent=2)) if template else form.schema_text or '' }}</textarea>
+    {% if errors and errors.get('schema_text') %}
+    <p class="text-sm text-red-600">{{ errors.get('schema_text') }}</p>
+    {% endif %}
+    <p class="mt-2 text-xs text-slate-500">Formato: lista de campos com name, label, type, required, hint.</p>
+  </div>
+  <button class="btn-primary" type="submit">Salvar</button>
+</form>
+{% endblock %}

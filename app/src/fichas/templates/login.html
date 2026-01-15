@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mx-auto max-w-md">
+  <div class="card p-8">
+    <h1 class="text-2xl font-semibold">Entrar</h1>
+    <p class="mt-2 text-sm text-slate-600">Use seu email e senha para acessar.</p>
+    {% if error %}
+    <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ error }}
+    </div>
+    {% endif %}
+    <form class="mt-6 space-y-4" method="post" action="/login">
+      <div>
+        <label class="text-sm font-medium">Email</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" name="email" type="email" required />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Senha</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" name="password" type="password" required />
+      </div>
+      <button class="btn-primary w-full" type="submit">Entrar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

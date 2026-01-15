@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid gap-6 md:grid-cols-3">
+  <div class="card p-6">
+    <div class="text-sm uppercase tracking-wide text-slate-500">Processos</div>
+    <div class="mt-3 text-3xl font-semibold">{{ processos_total }}</div>
+  </div>
+  <div class="card p-6">
+    <div class="text-sm uppercase tracking-wide text-slate-500">Fichas</div>
+    <div class="mt-3 text-3xl font-semibold">{{ fichas_total }}</div>
+  </div>
+  <div class="card p-6">
+    <div class="text-sm uppercase tracking-wide text-slate-500">Templates</div>
+    <div class="mt-3 text-3xl font-semibold">{{ templates_total }}</div>
+  </div>
+</div>
+<div class="mt-8 grid gap-4 md:grid-cols-3">
+  <a class="card p-5 transition hover:-translate-y-0.5" href="/processos/novo">
+    <h3 class="text-lg font-semibold">Novo processo</h3>
+    <p class="mt-2 text-sm text-slate-600">Cadastre um processo consolidado.</p>
+  </a>
+  <a class="card p-5 transition hover:-translate-y-0.5" href="/fichas/nova">
+    <h3 class="text-lg font-semibold">Nova ficha</h3>
+    <p class="mt-2 text-sm text-slate-600">Crie ficha a partir de um processo.</p>
+  </a>
+  <a class="card p-5 transition hover:-translate-y-0.5" href="/admin/templates/novo">
+    <h3 class="text-lg font-semibold">Novo template</h3>
+    <p class="mt-2 text-sm text-slate-600">Defina campos extras.</p>
+  </a>
+  <a class="card p-5 transition hover:-translate-y-0.5" href="/saiba-mais">
+    <h3 class="text-lg font-semibold">Saiba mais</h3>
+    <p class="mt-2 text-sm text-slate-600">Resumo de arquivistica e tipos de arquivo.</p>
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% set is_edit = processo is not none %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">{{ 'Editar processo' if is_edit else 'Novo processo' }}</h1>
+  <a class="btn-secondary" href="/processos">Voltar</a>
+</div>
+
+<form class="mt-6 space-y-4" method="post">
+  <div class="grid gap-4 md:grid-cols-2">
+    <div>
+      <label class="text-sm font-medium">Chave do processo</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="process_key" value="{{ form.process_key or processo.process_key if processo else form.process_key or '' }}" />
+      {% if errors and errors.get('process_key') %}
+      <p class="text-sm text-red-600">{{ errors.get('process_key') }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <label class="text-sm font-medium">TC numero</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="tc_numero" value="{{ form.tc_numero or processo.tc_numero if processo else form.tc_numero or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Ano</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="ano" value="{{ form.ano or processo.ano if processo else form.ano or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Data</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="date" name="data" value="{{ form.data or processo.data|format_date if processo else form.data or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Interessado</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="interessado" value="{{ form.interessado or processo.interessado if processo else form.interessado or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Assunto</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="assunto" value="{{ form.assunto or processo.assunto if processo else form.assunto or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Procedencia</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="procedencia" value="{{ form.procedencia or processo.procedencia if processo else form.procedencia or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Reparticao</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="reparticao" value="{{ form.reparticao or processo.reparticao if processo else form.reparticao or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Valor</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="valor" value="{{ form.valor or processo.valor if processo else form.valor or '' }}" />
+    </div>
+  </div>
+  <div>
+    <label class="text-sm font-medium">Observacoes</label>
+    <textarea class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="observacoes" rows="4">{{ form.observacoes or processo.observacoes if processo else form.observacoes or '' }}</textarea>
+  </div>
+  <button class="btn-primary" type="submit">Salvar</button>
+</form>
+{% endblock %}

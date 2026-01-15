@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold">Processo {{ process_label(processo) }}</h1>
+    <p class="text-sm text-slate-600">Detalhes do processo consolidado.</p>
+  </div>
+  <div class="flex gap-2">
+    <a class="btn-secondary" href="/processos/{{ processo.id }}/editar">Editar</a>
+    <a class="btn-primary" href="/fichas/nova?process_id={{ processo.id }}">Nova ficha</a>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 md:grid-cols-2">
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Dados basicos</h2>
+    <dl class="mt-4 space-y-2 text-sm">
+      <div><strong>Chave:</strong> {{ processo.process_key or '-' }}</div>
+      <div><strong>TC numero:</strong> {{ processo.tc_numero or '-' }}</div>
+      <div><strong>Ano:</strong> {{ processo.ano or '-' }}</div>
+      <div><strong>Data:</strong> {{ processo.data|format_date }}</div>
+      <div><strong>Interessado:</strong> {{ processo.interessado or '-' }}</div>
+      <div><strong>Assunto:</strong> {{ processo.assunto or '-' }}</div>
+      <div><strong>Procedencia:</strong> {{ processo.procedencia or '-' }}</div>
+      <div><strong>Reparticao:</strong> {{ processo.reparticao or '-' }}</div>
+      <div><strong>Valor:</strong> {{ processo.valor or '-' }}</div>
+    </dl>
+  </div>
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Observacoes</h2>
+    <p class="mt-4 text-sm text-slate-700">{{ processo.observacoes or 'Sem observacoes.' }}</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if processo is none and ficha is not defined and not manual %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">Selecionar processo</h1>
+</div>
+
+<div class="mt-4 flex flex-wrap items-center gap-2">
+  <a class="btn-primary" href="/fichas/nova?manual=1">Novo</a>
+  <button class="btn-secondary cursor-not-allowed opacity-50" type="button" disabled>Salvar</button>
+  <button class="btn-danger cursor-not-allowed opacity-50" type="button" disabled>Deletar</button>
+  <button class="btn-secondary" type="submit" form="process-search-form">Buscar</button>
+</div>
+
+{% if errors %}
+<div class="mt-4 card border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+  <strong>Corrija os campos destacados abaixo.</strong>
+</div>
+{% endif %}
+
+<form id="process-search-form" class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-4" method="get">
+  <input class="rounded-xl border border-slate-200 px-3 py-2" name="numero" placeholder="Numero ou chave" value="{{ process_filters.numero or '' }}" />
+  <input class="rounded-xl border border-slate-200 px-3 py-2" name="ano" placeholder="Ano" value="{{ process_filters.ano or '' }}" />
+  <input class="rounded-xl border border-slate-200 px-3 py-2" name="interessado" placeholder="Interessado" value="{{ process_filters.interessado or '' }}" />
+  <input class="rounded-xl border border-slate-200 px-3 py-2" name="assunto" placeholder="Assunto" value="{{ process_filters.assunto or '' }}" />
+  <button class="btn-primary md:col-span-4" type="submit">Buscar</button>
+</form>
+
+<div class="mt-6 card overflow-hidden">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50 text-left">
+      <tr>
+        <th class="px-4 py-3">Processo</th>
+        <th class="px-4 py-3">Interessado</th>
+        <th class="px-4 py-3">Assunto</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 bg-white">
+      {% for item in processos %}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{ process_label(item) }}</td>
+        <td class="px-4 py-3">{{ item.interessado or '-' }}</td>
+        <td class="px-4 py-3">{{ item.assunto or '-' }}</td>
+        <td class="px-4 py-3 text-right">
+          <a class="btn-secondary" href="/fichas/nova?process_id={{ item.id }}">Selecionar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+{% set is_edit = ficha is defined %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">{{ 'Editar ficha' if is_edit else 'Nova ficha' }}</h1>
+  <a class="btn-secondary" href="/fichas">Voltar</a>
+</div>
+
+<div class="mt-4 flex flex-wrap items-center gap-2">
+  <a class="btn-primary" href="/fichas/nova">Novo</a>
+  {% if template %}
+  <button class="btn-secondary" type="submit" form="ficha-form">Salvar</button>
+  {% else %}
+  <button class="btn-secondary cursor-not-allowed opacity-50" type="button" disabled>Salvar</button>
+  {% endif %}
+  {% if is_edit %}
+  <form method="post" action="/fichas/{{ ficha.id }}/excluir" onsubmit="return confirm('Excluir esta ficha?');">
+    <button class="btn-danger" type="submit">Deletar</button>
+  </form>
+  {% else %}
+  <button class="btn-danger cursor-not-allowed opacity-50" type="button" disabled>Deletar</button>
+  {% endif %}
+  <a class="btn-secondary" href="/fichas">Buscar</a>
+</div>
+
+{% if manual %}
+<div class="mt-4 text-sm text-slate-600">Processo: <strong>Cadastro manual</strong></div>
+{% else %}
+<div class="mt-4 text-sm text-slate-600">Processo: <strong>{{ process_label(processo) }}</strong></div>
+{% endif %}
+
+{% if errors %}
+<div class="mt-4 card border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+  <strong>Corrija os campos destacados abaixo.</strong>
+</div>
+{% endif %}
+
+{% if not is_edit %}
+<div class="mt-6 card p-6">
+  <h2 class="text-lg font-semibold">Selecionar template</h2>
+  <form class="mt-3 flex flex-wrap items-center gap-3" method="get">
+    {% if processo %}
+    <input type="hidden" name="process_id" value="{{ processo.id }}" />
+    {% endif %}
+    {% if manual %}
+    <input type="hidden" name="manual" value="1" />
+    {% endif %}
+    <select class="rounded-xl border border-slate-200 px-3 py-2" name="template_id">
+      <option value="">Selecione</option>
+      {% for t in templates_list %}
+      <option value="{{ t.id }}" {% if template and t.id == template.id %}selected{% endif %}>{{ t.nome }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn-secondary" type="submit">Carregar template</button>
+  </form>
+  {% if errors and errors.get('template_id') %}
+  <p class="mt-2 text-sm text-red-600">{{ errors.get('template_id') }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<form id="ficha-form" class="mt-6 space-y-6" method="post">
+  {% if processo %}
+  <input type="hidden" name="process_id" value="{{ processo.id }}" />
+  {% endif %}
+  {% if manual %}
+  <input type="hidden" name="manual" value="1" />
+  {% endif %}
+  {% if template %}
+  <input type="hidden" name="template_id" value="{{ template.id }}" />
+  {% endif %}
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Template</h2>
+    <div class="mt-3 text-sm text-slate-600">
+      {{ template.nome if template else 'Nenhum template selecionado' }}
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Campos base</h2>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium">Chave do processo</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="process_key" value="{{ form.process_key or processo.process_key or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">TC numero</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="tc_numero" value="{{ form.tc_numero or processo.tc_numero or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Ano</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="ano" value="{{ form.ano or processo.ano or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Data</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="date" name="data" value="{{ form.data or processo.data|format_date or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Interessado</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="interessado" value="{{ form.interessado or processo.interessado or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Assunto</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="assunto" value="{{ form.assunto or processo.assunto or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Procedencia</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="procedencia" value="{{ form.procedencia or processo.procedencia or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Reparticao</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="reparticao" value="{{ form.reparticao or processo.reparticao or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Valor</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="valor" value="{{ form.valor or processo.valor or '' }}" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Campos extras</h2>
+    {% if template %}
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      {% for field in template.schema_json %}
+      {% set value = (extras or {}).get(field.name) if extras is defined else '' %}
+      <div>
+        <label class="text-sm font-medium">
+          {{ field.label }}{% if field.required %} *{% endif %}
+        </label>
+        {% if field.type == 'date' %}
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="date" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
+        {% elif field.type == 'number' %}
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="number" step="any" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
+        {% else %}
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
+        {% endif %}
+        {% if field.hint %}
+        <p class="text-xs text-slate-500">{{ field.hint }}</p>
+        {% endif %}
+        {% if errors and errors.get('extra__' ~ field.name) %}
+        <p class="text-sm text-red-600">{{ errors.get('extra__' ~ field.name) }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="mt-3 text-sm text-slate-600">Selecione um template para ver os campos extras.</p>
+    {% endif %}
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Outros dados</h2>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium">Indexador</label>
+        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="indexador" value="{{ form.indexador or ficha.indexador if ficha is defined else form.indexador or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Observacoes</label>
+        <textarea class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="observacoes" rows="3">{{ form.observacoes or ficha.observacoes if ficha is defined else form.observacoes or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary" type="submit">{{ 'Salvar ficha' if is_edit else 'Cadastrar ficha' }}</button>
+</form>
+{% endif %}
+{% endblock %}

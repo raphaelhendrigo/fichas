@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold">Saiba mais</h1>
+    <p class="text-sm text-slate-600">Resumo do curso de introducao a arquivistica.</p>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6">
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Resumo rapido</h2>
+    <p class="mt-3 text-sm text-slate-700">
+      Arquivo e o conjunto de documentos produzidos e acumulados por uma pessoa, familia ou entidade
+      no desempenho de suas atividades. Esses documentos sao organicos: guardam relacao direta com a
+      entidade produtora. O arquivo pode conter documentos recebidos e produzidos, em qualquer suporte,
+      e serve tanto a fins administrativos quanto a memoria, pesquisa e prova de direitos.
+    </p>
+  </div>
+
+  <div class="grid gap-6 md:grid-cols-2">
+    <div class="card p-6">
+      <h2 class="text-lg font-semibold">Tipos de arquivo (entidade produtora)</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+        <li><strong>Arquivo publico:</strong> documentos produzidos e acumulados por orgaos e entidades publicas, em qualquer nivel de governo.</li>
+        <li><strong>Arquivo privado:</strong> documentos produzidos e acumulados por pessoas fisicas ou juridicas de direito privado, familias ou grupos.</li>
+        <li><strong>Arquivo privado de interesse publico e social:</strong> pode ser declarado de interesse publico, sem perder a natureza privada, e nao pode ser disperso ou transferido para o exterior.</li>
+      </ul>
+    </div>
+
+    <div class="card p-6">
+      <h2 class="text-lg font-semibold">Tipos de arquivo (entidade custodiadora)</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+        <li><strong>Arquivos publicos:</strong> instituicoes governamentais responsaveis por gestao, recolhimento, guarda permanente e acesso.</li>
+        <li><strong>Arquivos privados custodiadores:</strong> centros de documentacao, memoria e pesquisa que guardam arquivos privados.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Teoria das tres idades (fases do arquivo)</h2>
+    <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+      <li><strong>Arquivo corrente:</strong> documentos em uso frequente, ligados ao valor primario.</li>
+      <li><strong>Arquivo intermediario:</strong> documentos com uso pouco frequente, aguardando destinacao final.</li>
+      <li><strong>Arquivo permanente:</strong> documentos preservados de forma definitiva por valor secundario; sao inalienaveis e imprescritiveis.</li>
+    </ul>
+    <p class="mt-3 text-sm text-slate-700">
+      <strong>Valor primario</strong> refere-se ao uso administrativo, legal e fiscal. <strong>Valor secundario</strong> refere-se ao uso para memoria, pesquisa e informacao para terceiros.
+    </p>
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Tipos de documentos de arquivo</h2>
+    <p class="mt-3 text-sm text-slate-700">
+      Os documentos podem estar em papel ou em outros suportes, como fotografias, cartazes, mapas,
+      plantas, filmes, videos, registros sonoros, partituras e formatos digitais.
+    </p>
+    <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+      <li><strong>Genero documental:</strong> agrupado pela linguagem usada no registro (textual, cartografico, audiovisual, micrografico).</li>
+      <li><strong>Observacao:</strong> nao ha consenso sobre documento eletronico/digital como genero, pois pode assumir diversos formatos.</li>
+      <li><strong>Especie documental:</strong> formato do documento; exemplos textuais: regimento, apostila, ata, termo, certidao, atestado, convenio, contrato, oficio, carta, edital, telegrama, notificacao, alvara, circular.</li>
+      <li><strong>Tipo documental:</strong> especie + finalidade do documento.</li>
+      <li><strong>Natureza do assunto:</strong> documentos ostensivos ou sigilosos.</li>
+    </ul>
+  </div>
+
+  <div class="card p-6">
+    <h2 class="text-lg font-semibold">Funcoes arquivisticas</h2>
+    <p class="mt-3 text-sm text-slate-700">
+      Criacao, avaliacao, aquisicao, conservacao, classificacao, descricao e difusao dos arquivos.
+    </p>
+  </div>
+</div>
+{% endblock %}
