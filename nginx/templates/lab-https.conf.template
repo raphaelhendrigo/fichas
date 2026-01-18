@@ -1,0 +1,55 @@
+server {
+    listen 80 default_server;
+    server_name ${SERVER_NAME} _;
+
+    location = /healthz {
+        return 200 "ok";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        auth_basic off;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name ${SERVER_NAME} _;
+
+    ssl_certificate ${TLS_CERT_PATH};
+    ssl_certificate_key ${TLS_KEY_PATH};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_prefer_server_ciphers off;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location = /healthz {
+        return 200 "ok";
+    }
+
+    client_max_body_size ${CLIENT_MAX_BODY_SIZE};
+
+    location / {
+        limit_req zone=req_limit_per_ip burst=20 nodelay;
+        auth_basic ${BASIC_AUTH_ENABLED};
+        auth_basic_user_file ${BASIC_AUTH_FILE};
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_pass ${APP_UPSTREAM};
+        proxy_read_timeout 60s;
+    }
+}

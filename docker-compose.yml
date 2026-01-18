@@ -1,29 +1,105 @@
 services:
   db:
     image: postgres:16
+    restart: always
     environment:
-      POSTGRES_DB: fichas
-      POSTGRES_USER: fichas
-      POSTGRES_PASSWORD: fichas
+      POSTGRES_DB: ${POSTGRES_DB:-fichas}
+      POSTGRES_USER: ${POSTGRES_USER:-fichas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fichas}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fichas -d fichas"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab
 
   app:
-    build: .
+    build:
+      context: .
+    restart: always
     env_file: .env
-    ports:
-      - "8080:8080"
+    environment:
+      PORT: ${PORT:-8080}
     volumes:
-      - ./app:/app
       - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import os,sys,httpx; port=os.getenv('PORT','8080'); url=f'http://localhost:{port}/login'; sys.exit(0) if httpx.get(url, timeout=5).status_code < 500 else sys.exit(1)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab
+
+  nginx:
+    build:
+      context: ./nginx
+    restart: always
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-lab.engenhodigitalweb.com.br}
+      ENABLE_HTTPS: ${ENABLE_HTTPS:-true}
+      ENABLE_BASIC_AUTH: ${ENABLE_BASIC_AUTH:-false}
+      BASIC_AUTH_FILE: /etc/nginx/htpasswd/htpasswd
+      APP_UPSTREAM: http://app:${PORT:-8080}
+      CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-50m}
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+      - ./certs:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -H \"Host: ${SERVER_NAME:-lab.engenhodigitalweb.com.br}\" http://localhost/healthz > /dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["letsencrypt"]
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - lab
 
 volumes:
   db_data:
+
+networks:
+  lab:
+    driver: bridge

@@ -17,3 +17,9 @@ dist/
 build/
 *.egg-info/
 data/
+.secrets/
+certs/*
+!certs/.gitkeep
+certbot/www/*
+!certbot/www/.gitkeep
+nginx/htpasswd/htpasswd

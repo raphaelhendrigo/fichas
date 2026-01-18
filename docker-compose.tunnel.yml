@@ -1,0 +1,25 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    depends_on:
+      nginx:
+        condition: service_healthy
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "run",
+        "--token-file",
+        "/run/secrets/cloudflared_token",
+        "--url",
+        "http://nginx:80",
+      ]
+    secrets:
+      - cloudflared_token
+    networks:
+      - lab
+
+secrets:
+  cloudflared_token:
+    file: ./.secrets/tunnel_token.txt

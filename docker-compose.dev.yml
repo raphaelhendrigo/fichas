@@ -1,0 +1,7 @@
+services:
+  app:
+    command: ["sh", "-c", "uvicorn fichas.main:app --host 0.0.0.0 --port ${PORT:-8080} --reload"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app:/app
