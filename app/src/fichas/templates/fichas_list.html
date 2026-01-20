@@ -4,30 +4,39 @@
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">Fichas</h1>
   <div class="flex items-center gap-2">
-    <a class="btn-primary" href="/fichas/nova">Cadastrar ficha</a>
-    <a class="btn-secondary" href="/fichas/nova?manual=1">Ficha manual</a>
+    <a class="btn-primary" href="{{ url_path('/fichas/nova') }}">Cadastrar ficha</a>
+    <a class="btn-secondary" href="{{ url_path('/fichas/nova') }}?manual=1">Ficha manual</a>
   </div>
 </div>
 
 <form
-  class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-6"
-  hx-get="/fichas"
+  class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-8"
+  hx-get="{{ url_path('/fichas') }}"
   hx-target="#ficha-list"
   hx-trigger="keyup changed delay:350ms from:input, change from:select"
   hx-push-url="true"
 >
+  <input class="rounded-xl border border-slate-200 px-3 py-2 md:col-span-2" name="q" placeholder="Busca livre" value="{{ filters.q or '' }}" />
   <input class="rounded-xl border border-slate-200 px-3 py-2" name="numero" placeholder="Numero ou chave" value="{{ filters.numero or '' }}" />
   <input class="rounded-xl border border-slate-200 px-3 py-2" name="ano" placeholder="Ano" value="{{ filters.ano or '' }}" />
   <input class="rounded-xl border border-slate-200 px-3 py-2" name="interessado" placeholder="Interessado" value="{{ filters.interessado or '' }}" />
   <input class="rounded-xl border border-slate-200 px-3 py-2" name="assunto" placeholder="Assunto" value="{{ filters.assunto or '' }}" />
   <input class="rounded-xl border border-slate-200 px-3 py-2" name="indexador" placeholder="Indexador" value="{{ filters.indexador or '' }}" />
+  <select class="rounded-xl border border-slate-200 px-3 py-2" name="status">
+    <option value="">Status</option>
+    <option value="ativo" {% if filters.status == 'ativo' %}selected{% endif %}>Ativo</option>
+    <option value="rascunho" {% if filters.status == 'rascunho' %}selected{% endif %}>Rascunho</option>
+    <option value="arquivado" {% if filters.status == 'arquivado' %}selected{% endif %}>Arquivado</option>
+  </select>
   <select class="rounded-xl border border-slate-200 px-3 py-2" name="template_id">
     <option value="">Template</option>
     {% for template in templates_list %}
-    <option value="{{ template.id }}" {% if filters.template_id == (template.id ~ '') %}selected{% endif %}>{{ template.nome }}</option>
+    <option value="{{ template.id }}" {% if filters.template_id == (template.id ~ '') %}selected{% endif %}>{{ template.nome }} v{{ template.versao }}</option>
     {% endfor %}
   </select>
-  <button class="btn-secondary md:col-span-6" type="submit">Buscar</button>
+  <input class="rounded-xl border border-slate-200 px-3 py-2 md:col-span-2" type="date" name="data_inicio" value="{{ filters.data_inicio or '' }}" />
+  <input class="rounded-xl border border-slate-200 px-3 py-2 md:col-span-2" type="date" name="data_fim" value="{{ filters.data_fim or '' }}" />
+  <button class="btn-secondary md:col-span-8" type="submit">Buscar</button>
 </form>
 
 <div id="ficha-list" class="mt-6">

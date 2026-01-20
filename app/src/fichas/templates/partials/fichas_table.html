@@ -5,6 +5,7 @@
       <tr>
         <th class="px-4 py-3">Processo</th>
         <th class="px-4 py-3">Template</th>
+        <th class="px-4 py-3">Status</th>
         <th class="px-4 py-3">Indexador</th>
         <th class="px-4 py-3">Criado</th>
         <th class="px-4 py-3"></th>
@@ -14,14 +15,15 @@
       {% for ficha in fichas %}
       <tr>
         <td class="px-4 py-3 font-medium">{{ process_label(ficha.process) }}</td>
-        <td class="px-4 py-3">{{ ficha.template.nome }}</td>
+        <td class="px-4 py-3">{{ ficha.template.nome }} v{{ ficha.template.versao }}</td>
+        <td class="px-4 py-3">{{ ficha.status }}</td>
         <td class="px-4 py-3">{{ ficha.indexador or '-' }}</td>
         <td class="px-4 py-3">{{ ficha.created_at|format_datetime }}</td>
         <td class="px-4 py-3 text-right">
           <div class="flex items-center justify-end gap-2">
-            <a class="btn-secondary" href="/fichas/{{ ficha.id }}">Abrir</a>
-            <a class="btn-secondary" href="/fichas/{{ ficha.id }}/editar">Editar</a>
-            <form method="post" action="/fichas/{{ ficha.id }}/excluir" onsubmit="return confirm('Excluir esta ficha?');">
+            <a class="btn-secondary" href="{{ url_path('/fichas/' ~ ficha.id) }}">Abrir</a>
+            <a class="btn-secondary" href="{{ url_path('/fichas/' ~ ficha.id ~ '/editar') }}">Editar</a>
+            <form method="post" action="{{ url_path('/fichas/' ~ ficha.id ~ '/excluir') }}" onsubmit="return confirm('Excluir esta ficha?');">
               <button class="btn-danger" type="submit">Excluir</button>
             </form>
           </div>

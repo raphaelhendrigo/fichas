@@ -20,7 +20,18 @@ def test_create_ficha(client, db_session):
     template = FichaTemplate(
         nome="Template X",
         descricao="",
-        schema_json=[{"name": "campo_extra", "label": "Campo Extra", "type": "text", "required": True}],
+        versao=1,
+        is_active=True,
+        schema_json={
+            "sections": [
+                {
+                    "id": "geral",
+                    "label": "Geral",
+                    "order": 1,
+                    "fields": [{"id": "campo_extra", "label": "Campo Extra", "type": "text", "required": True}],
+                }
+            ]
+        },
     )
     db_session.add(process)
     db_session.add(template)
@@ -52,7 +63,18 @@ def test_create_ficha_manual(client, db_session):
     template = FichaTemplate(
         nome="Template Manual",
         descricao="",
-        schema_json=[{"name": "campo_extra", "label": "Campo Extra", "type": "text", "required": True}],
+        versao=1,
+        is_active=True,
+        schema_json={
+            "sections": [
+                {
+                    "id": "geral",
+                    "label": "Geral",
+                    "order": 1,
+                    "fields": [{"id": "campo_extra", "label": "Campo Extra", "type": "text", "required": True}],
+                }
+            ]
+        },
     )
     db_session.add(template)
     db_session.commit()
@@ -85,7 +107,18 @@ def test_delete_ficha(client, db_session):
     template = FichaTemplate(
         nome="Template Delete",
         descricao="",
-        schema_json=[{"name": "campo_extra", "label": "Campo Extra", "type": "text", "required": False}],
+        versao=1,
+        is_active=True,
+        schema_json={
+            "sections": [
+                {
+                    "id": "geral",
+                    "label": "Geral",
+                    "order": 1,
+                    "fields": [{"id": "campo_extra", "label": "Campo Extra", "type": "text", "required": False}],
+                }
+            ]
+        },
     )
     db_session.add(process)
     db_session.add(template)

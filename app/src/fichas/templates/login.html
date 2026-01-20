@@ -10,7 +10,7 @@
       {{ error }}
     </div>
     {% endif %}
-    <form class="mt-6 space-y-4" method="post" action="/login">
+    <form class="mt-6 space-y-4" method="post" action="{{ url_path('/login') }}">
       <div>
         <label class="text-sm font-medium">Email</label>
         <input class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" name="email" type="email" required />

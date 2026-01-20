@@ -7,7 +7,7 @@
 </div>
 
 <div class="mt-4 flex flex-wrap items-center gap-2">
-  <a class="btn-primary" href="/fichas/nova?manual=1">Novo</a>
+  <a class="btn-primary" href="{{ url_path('/fichas/nova') }}?manual=1">Novo</a>
   <button class="btn-secondary cursor-not-allowed opacity-50" type="button" disabled>Salvar</button>
   <button class="btn-danger cursor-not-allowed opacity-50" type="button" disabled>Deletar</button>
   <button class="btn-secondary" type="submit" form="process-search-form">Buscar</button>
@@ -44,7 +44,7 @@
         <td class="px-4 py-3">{{ item.interessado or '-' }}</td>
         <td class="px-4 py-3">{{ item.assunto or '-' }}</td>
         <td class="px-4 py-3 text-right">
-          <a class="btn-secondary" href="/fichas/nova?process_id={{ item.id }}">Selecionar</a>
+          <a class="btn-secondary" href="{{ url_path('/fichas/nova') }}?process_id={{ item.id }}">Selecionar</a>
         </td>
       </tr>
       {% endfor %}
@@ -55,24 +55,24 @@
 {% set is_edit = ficha is defined %}
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">{{ 'Editar ficha' if is_edit else 'Nova ficha' }}</h1>
-  <a class="btn-secondary" href="/fichas">Voltar</a>
+  <a class="btn-secondary" href="{{ url_path('/fichas') }}">Voltar</a>
 </div>
 
 <div class="mt-4 flex flex-wrap items-center gap-2">
-  <a class="btn-primary" href="/fichas/nova">Novo</a>
+  <a class="btn-primary" href="{{ url_path('/fichas/nova') }}">Novo</a>
   {% if template %}
   <button class="btn-secondary" type="submit" form="ficha-form">Salvar</button>
   {% else %}
   <button class="btn-secondary cursor-not-allowed opacity-50" type="button" disabled>Salvar</button>
   {% endif %}
   {% if is_edit %}
-  <form method="post" action="/fichas/{{ ficha.id }}/excluir" onsubmit="return confirm('Excluir esta ficha?');">
+  <form method="post" action="{{ url_path('/fichas/' ~ ficha.id ~ '/excluir') }}" onsubmit="return confirm('Excluir esta ficha?');">
     <button class="btn-danger" type="submit">Deletar</button>
   </form>
   {% else %}
   <button class="btn-danger cursor-not-allowed opacity-50" type="button" disabled>Deletar</button>
   {% endif %}
-  <a class="btn-secondary" href="/fichas">Buscar</a>
+  <a class="btn-secondary" href="{{ url_path('/fichas') }}">Buscar</a>
 </div>
 
 {% if manual %}
@@ -100,7 +100,7 @@
     <select class="rounded-xl border border-slate-200 px-3 py-2" name="template_id">
       <option value="">Selecione</option>
       {% for t in templates_list %}
-      <option value="{{ t.id }}" {% if template and t.id == template.id %}selected{% endif %}>{{ t.nome }}</option>
+      <option value="{{ t.id }}" {% if template and t.id == template.id %}selected{% endif %}>{{ t.nome }} v{{ t.versao }}</option>
       {% endfor %}
     </select>
     <button class="btn-secondary" type="submit">Carregar template</button>
@@ -124,9 +124,16 @@
 
   <div class="card p-6">
     <h2 class="text-lg font-semibold">Template</h2>
+    {% if template %}
     <div class="mt-3 text-sm text-slate-600">
-      {{ template.nome if template else 'Nenhum template selecionado' }}
+      {{ template.nome }} v{{ template.versao }}
     </div>
+    {% if template.origem_pdf %}
+    <div class="mt-1 text-xs text-slate-500">Origem: {{ template.origem_pdf }}</div>
+    {% endif %}
+    {% else %}
+    <div class="mt-3 text-sm text-slate-600">Nenhum template selecionado</div>
+    {% endif %}
   </div>
 
   <div class="card p-6">
@@ -173,30 +180,110 @@
 
   <div class="card p-6">
     <h2 class="text-lg font-semibold">Campos extras</h2>
-    {% if template %}
-    <div class="mt-4 grid gap-4 md:grid-cols-2">
-      {% for field in template.schema_json %}
-      {% set value = (extras or {}).get(field.name) if extras is defined else '' %}
-      <div>
-        <label class="text-sm font-medium">
-          {{ field.label }}{% if field.required %} *{% endif %}
-        </label>
-        {% if field.type == 'date' %}
-        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="date" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
-        {% elif field.type == 'number' %}
-        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" type="number" step="any" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
-        {% else %}
-        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="extra__{{ field.name }}" value="{{ value or '' }}" {% if field.required %}required{% endif %} />
+    {% if template_schema %}
+      {% for section in template_schema.sections %}
+      <div class="mt-6">
+        <h3 class="text-base font-semibold">{{ section.label }}</h3>
+        {% if section.description %}
+        <p class="mt-1 text-sm text-slate-500">{{ section.description }}</p>
         {% endif %}
-        {% if field.hint %}
-        <p class="text-xs text-slate-500">{{ field.hint }}</p>
-        {% endif %}
-        {% if errors and errors.get('extra__' ~ field.name) %}
-        <p class="text-sm text-red-600">{{ errors.get('extra__' ~ field.name) }}</p>
-        {% endif %}
+        <div class="mt-4 grid gap-4 md:grid-cols-12">
+          {% for field in section.fields %}
+          {% set value = (extras or {}).get(field.field_id) if extras is defined else '' %}
+          {% set display_value = value if value is not none else '' %}
+          {% set width = field.layout.width if field.layout and field.layout.width else 6 %}
+          <div style="grid-column: span {{ width }} / span {{ width }};">
+            <label class="text-sm font-medium">
+              {{ field.label }}{% if field.required %} *{% endif %}
+            </label>
+            {% if field.type == 'textarea' %}
+            <textarea
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              name="extra__{{ field.field_id }}"
+              rows="3"
+              {% if field.layout and field.layout.placeholder %}placeholder="{{ field.layout.placeholder }}"{% endif %}
+              {% if field.validations and field.validations.min_length %}minlength="{{ field.validations.min_length }}"{% endif %}
+              {% if field.validations and field.validations.max_length %}maxlength="{{ field.validations.max_length }}"{% endif %}
+              {% if field.required %}required{% endif %}
+            >{{ display_value }}</textarea>
+            {% elif field.type == 'date' %}
+            <input
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              type="date"
+              name="extra__{{ field.field_id }}"
+              value="{{ display_value }}"
+              {% if field.required %}required{% endif %}
+            />
+            {% elif field.type == 'number' %}
+            <input
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              type="number"
+              step="any"
+              name="extra__{{ field.field_id }}"
+              value="{{ display_value }}"
+              {% if field.validations and field.validations.min_value is not none %}min="{{ field.validations.min_value }}"{% endif %}
+              {% if field.validations and field.validations.max_value is not none %}max="{{ field.validations.max_value }}"{% endif %}
+              {% if field.required %}required{% endif %}
+            />
+            {% elif field.type == 'currency' %}
+            <input
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              type="number"
+              step="0.01"
+              name="extra__{{ field.field_id }}"
+              value="{{ display_value }}"
+              {% if field.validations and field.validations.min_value is not none %}min="{{ field.validations.min_value }}"{% endif %}
+              {% if field.validations and field.validations.max_value is not none %}max="{{ field.validations.max_value }}"{% endif %}
+              {% if field.required %}required{% endif %}
+            />
+            {% elif field.type == 'boolean' %}
+            <div class="mt-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-slate-300"
+                name="extra__{{ field.field_id }}"
+                value="true"
+                {% if value %}checked{% endif %}
+                {% if field.required %}required{% endif %}
+              />
+              <span class="text-sm text-slate-600">Sim</span>
+            </div>
+            {% elif field.type == 'enum' %}
+            <select
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              name="extra__{{ field.field_id }}"
+              {% if field.required %}required{% endif %}
+            >
+              <option value="">Selecione</option>
+              {% for option in field.options %}
+              <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <input
+              class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              name="extra__{{ field.field_id }}"
+              value="{{ display_value }}"
+              {% if field.layout and field.layout.placeholder %}placeholder="{{ field.layout.placeholder }}"{% endif %}
+              {% if field.validations and field.validations.min_length %}minlength="{{ field.validations.min_length }}"{% endif %}
+              {% if field.validations and field.validations.max_length %}maxlength="{{ field.validations.max_length }}"{% endif %}
+              {% if field.validations and field.validations.regex %}pattern="{{ field.validations.regex }}"{% endif %}
+              {% if field.required %}required{% endif %}
+            />
+            {% endif %}
+            {% if field.layout and field.layout.help %}
+            <p class="text-xs text-slate-500">{{ field.layout.help }}</p>
+            {% elif field.hint %}
+            <p class="text-xs text-slate-500">{{ field.hint }}</p>
+            {% endif %}
+            {% if errors and errors.get('extra__' ~ field.field_id) %}
+            <p class="text-sm text-red-600">{{ errors.get('extra__' ~ field.field_id) }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
       </div>
       {% endfor %}
-    </div>
     {% else %}
     <p class="mt-3 text-sm text-slate-600">Selecione um template para ver os campos extras.</p>
     {% endif %}
@@ -204,10 +291,22 @@
 
   <div class="card p-6">
     <h2 class="text-lg font-semibold">Outros dados</h2>
-    <div class="mt-4 grid gap-4 md:grid-cols-2">
+    {% set status_value = form.status or (ficha.status if ficha is defined else 'ativo') %}
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
       <div>
         <label class="text-sm font-medium">Indexador</label>
         <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="indexador" value="{{ form.indexador or ficha.indexador if ficha is defined else form.indexador or '' }}" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Status</label>
+        <select class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="status">
+          <option value="ativo" {% if status_value == 'ativo' %}selected{% endif %}>Ativo</option>
+          <option value="rascunho" {% if status_value == 'rascunho' %}selected{% endif %}>Rascunho</option>
+          <option value="arquivado" {% if status_value == 'arquivado' %}selected{% endif %}>Arquivado</option>
+        </select>
+        {% if errors and errors.get('status') %}
+        <p class="text-sm text-red-600">{{ errors.get('status') }}</p>
+        {% endif %}
       </div>
       <div>
         <label class="text-sm font-medium">Observacoes</label>

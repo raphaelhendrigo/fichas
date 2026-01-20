@@ -15,11 +15,7 @@ services:
         "--url",
         "http://nginx:80",
       ]
-    secrets:
-      - cloudflared_token
+    volumes:
+      - ./.secrets/tunnel_token.txt:/run/secrets/cloudflared_token:ro
     networks:
       - lab
-
-secrets:
-  cloudflared_token:
-    file: ./.secrets/tunnel_token.txt

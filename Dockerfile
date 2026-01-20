@@ -7,6 +7,8 @@ ENV PYTHONPATH=/app/src
 ENV PORT=8080
 
 COPY app /app
+COPY tools /app/tools
+COPY templates_draft /app/templates_draft
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .

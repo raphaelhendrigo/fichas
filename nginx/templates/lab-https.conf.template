@@ -11,7 +11,7 @@ server {
         auth_basic off;
     }
 
-    location / {
+    location ${APP_BASE_PATH} {
         return 301 https://$host$request_uri;
     }
 }
@@ -39,7 +39,7 @@ server {
 
     client_max_body_size ${CLIENT_MAX_BODY_SIZE};
 
-    location / {
+    location ${APP_BASE_PATH} {
         limit_req zone=req_limit_per_ip burst=20 nodelay;
         auth_basic ${BASIC_AUTH_ENABLED};
         auth_basic_user_file ${BASIC_AUTH_FILE};

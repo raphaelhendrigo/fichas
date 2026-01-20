@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import declarative_base, relationship
@@ -91,9 +92,13 @@ class Process(Base):
 
 class FichaTemplate(Base):
     __tablename__ = "ficha_templates"
+    __table_args__ = (UniqueConstraint("nome", "versao", name="uq_ficha_templates_nome_versao"),)
 
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
-    nome = Column(String(150), unique=True, nullable=False)
+    nome = Column(String(150), nullable=False)
+    versao = Column(Integer, nullable=False, default=1)
+    origem_pdf = Column(String(255), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
     descricao = Column(Text, nullable=True)
     schema_json = Column(JSONType, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -113,10 +118,14 @@ class Ficha(Base):
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     process_id = Column(GUID(), ForeignKey("processes.id"), nullable=False)
     template_id = Column(GUID(), ForeignKey("ficha_templates.id"), nullable=False)
+    template_version = Column(Integer, nullable=False, default=1)
     indexador = Column(String(100), nullable=True)
     campos_base_json = Column(JSONType, nullable=False)
     extras_json = Column(JSONType, nullable=True)
     observacoes = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="ativo")
+    created_by_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    updated_by_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
@@ -128,6 +137,8 @@ class Ficha(Base):
     process = relationship("Process", back_populates="fichas")
     template = relationship("FichaTemplate", back_populates="fichas")
     attachments = relationship("Attachment", back_populates="ficha", cascade="all, delete-orphan")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    updated_by = relationship("User", foreign_keys=[updated_by_id])
 
 
 class Attachment(Base):
@@ -166,3 +177,4 @@ Index("ix_processes_assunto", Process.assunto)
 Index("ix_fichas_process_id", Ficha.process_id)
 Index("ix_fichas_template_id", Ficha.template_id)
 Index("ix_fichas_indexador", Ficha.indexador)
+Index("ix_fichas_status", Ficha.status)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,19 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = False
     SESSION_EXPIRES_SECONDS: int = 60 * 60 * 12
     PAGINATION_PAGE_SIZE: int = 20
+    APP_BASE_PATH: str = ""
+
+    @field_validator("APP_BASE_PATH", mode="before")
+    @classmethod
+    def normalize_base_path(cls, v):
+        if v is None:
+            return ""
+        value = str(v).strip()
+        if value in ("", "/"):
+            return ""
+        if not value.startswith("/"):
+            value = "/" + value
+        return value.rstrip("/")
 
 
 settings = Settings()

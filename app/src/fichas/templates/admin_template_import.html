@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex items-center justify-between">
+  <h1 class="text-2xl font-semibold">Importar template</h1>
+  <a class="btn-secondary" href="{{ url_path('/admin/templates') }}">Voltar</a>
+</div>
+
+<div class="mt-6 card p-6">
+  <p class="text-sm text-slate-600">Envie um arquivo JSON gerado em templates_draft para criar uma nova versao.</p>
+
+  {% if message %}
+  <div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+    {{ message }}
+  </div>
+  {% endif %}
+
+  {% if errors and errors.get('file') %}
+  <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    {{ errors.get('file') }}
+  </div>
+  {% endif %}
+
+  <form class="mt-4 flex flex-col gap-4" method="post" enctype="multipart/form-data" action="{{ url_path('/admin/templates/importar') }}">
+    <input class="rounded-xl border border-slate-200 px-3 py-2" type="file" name="file" accept="application/json" />
+    <button class="btn-primary w-fit" type="submit">Importar</button>
+  </form>
+</div>
+{% endblock %}

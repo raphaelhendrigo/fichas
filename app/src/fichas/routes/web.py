@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -25,8 +26,10 @@ from fichas.schemas import (
     FichaBaseForm,
     LoginForm,
     ProcessForm,
-    TemplateField,
     TemplateForm,
+    TemplateSchema,
+    build_template_field_map,
+    normalize_template_schema,
     validation_errors_to_dict,
 )
 from fichas.services.fichas_service import (
@@ -38,7 +41,14 @@ from fichas.services.fichas_service import (
     update_ficha,
 )
 from fichas.services.processos_service import create_process, get_process, list_processes, update_process
-from fichas.services.templates_service import create_template, get_template, list_templates, update_template
+from fichas.services.templates_service import (
+    create_template,
+    create_template_version,
+    get_template,
+    import_template_payload,
+    list_templates,
+    set_template_active,
+)
 from fichas.settings import settings
 from fichas.storage import get_storage_backend
 
@@ -85,6 +95,18 @@ templates.env.filters["format_datetime"] = format_datetime
 templates.env.globals["build_query"] = build_query
 templates.env.globals["process_label"] = process_label
 templates.env.globals["app_version"] = __version__
+templates.env.globals["app_prefix"] = settings.APP_BASE_PATH
+
+
+def with_prefix(path: str) -> str:
+    if not path.startswith("/"):
+        path = f"/{path}"
+    if not settings.APP_BASE_PATH:
+        return path
+    return f"{settings.APP_BASE_PATH}{path}"
+
+
+templates.env.globals["url_path"] = with_prefix
 
 
 def is_htmx(request: Request) -> bool:
@@ -94,9 +116,9 @@ def is_htmx(request: Request) -> bool:
 def ensure_user(request: Request, db: Session, admin: bool = False):
     user = get_current_user_optional(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=303)
+        return RedirectResponse(with_prefix("/login"), status_code=303)
     if admin and not user.is_admin:
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse(with_prefix("/"), status_code=303)
     return user
 
 
@@ -120,14 +142,15 @@ def get_or_create_manual_template(db: Session, user) -> FichaTemplate:
     template = db.execute(select(FichaTemplate).where(FichaTemplate.nome == "Cadastro manual")).scalar_one_or_none()
     if template:
         return template
-    return create_template(db, "Cadastro manual", "Ficha sem campos extras", "[]", user)
+    schema = {"sections": [{"id": "geral", "label": "Geral", "order": 1, "fields": []}]}
+    return create_template(db, "Cadastro manual", "Ficha sem campos extras", schema, user)
 
 
 @router.get("/login")
 def login_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_optional(request, db)
     if user:
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse(with_prefix("/"), status_code=303)
     return templates.TemplateResponse("login.html", {"request": request, "show_nav": False})
 
 
@@ -144,7 +167,7 @@ async def login_action(request: Request, db: Session = Depends(get_db)):
         )
 
     token = create_session_token(user.id)
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse(with_prefix("/"), status_code=303)
     response.set_cookie(
         SESSION_COOKIE_NAME,
         token,
@@ -158,7 +181,7 @@ async def login_action(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/logout")
 def logout_action():
-    response = RedirectResponse("/login", status_code=303)
+    response = RedirectResponse(with_prefix("/login"), status_code=303)
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
 
@@ -252,7 +275,7 @@ async def processo_criar(request: Request, db: Session = Depends(get_db)):
         )
 
     processo = create_process(db, data.model_dump(), user)
-    return RedirectResponse(f"/processos/{processo.id}", status_code=303)
+    return RedirectResponse(with_prefix(f"/processos/{processo.id}"), status_code=303)
 
 
 @router.get("/processos/{process_id}")
@@ -262,7 +285,7 @@ def processo_detail(process_id: str, request: Request, db: Session = Depends(get
         return user
     processo = get_process(db, process_id)
     if not processo:
-        return RedirectResponse("/processos", status_code=303)
+        return RedirectResponse(with_prefix("/processos"), status_code=303)
     return templates.TemplateResponse(
         "processo_detail.html",
         {"request": request, "user": user, "processo": processo},
@@ -276,7 +299,7 @@ def processo_editar(process_id: str, request: Request, db: Session = Depends(get
         return user
     processo = get_process(db, process_id)
     if not processo:
-        return RedirectResponse("/processos", status_code=303)
+        return RedirectResponse(with_prefix("/processos"), status_code=303)
     return templates.TemplateResponse(
         "processo_form.html",
         {"request": request, "user": user, "processo": processo, "form": {}},
@@ -290,7 +313,7 @@ async def processo_atualizar(process_id: str, request: Request, db: Session = De
         return user
     processo = get_process(db, process_id)
     if not processo:
-        return RedirectResponse("/processos", status_code=303)
+        return RedirectResponse(with_prefix("/processos"), status_code=303)
 
     form = await request.form()
     form_data = dict(form)
@@ -305,7 +328,7 @@ async def processo_atualizar(process_id: str, request: Request, db: Session = De
         )
 
     processo = update_process(db, processo, data.model_dump(), user)
-    return RedirectResponse(f"/processos/{processo.id}", status_code=303)
+    return RedirectResponse(with_prefix(f"/processos/{processo.id}"), status_code=303)
 
 
 @router.get("/fichas")
@@ -316,14 +339,30 @@ def fichas_list(request: Request, db: Session = Depends(get_db)):
 
     page = int(request.query_params.get("page", "1"))
     page_size = int(request.query_params.get("page_size", settings.PAGINATION_PAGE_SIZE))
+    data_inicio_raw = request.query_params.get("data_inicio")
+    data_fim_raw = request.query_params.get("data_fim")
     filters = {
+        "q": request.query_params.get("q"),
         "numero": request.query_params.get("numero"),
         "ano": request.query_params.get("ano"),
         "interessado": request.query_params.get("interessado"),
         "assunto": request.query_params.get("assunto"),
         "indexador": request.query_params.get("indexador"),
         "template_id": request.query_params.get("template_id"),
+        "status": request.query_params.get("status"),
+        "data_inicio": None,
+        "data_fim": None,
     }
+    if data_inicio_raw:
+        try:
+            filters["data_inicio"] = date.fromisoformat(data_inicio_raw)
+        except ValueError:
+            pass
+    if data_fim_raw:
+        try:
+            filters["data_fim"] = date.fromisoformat(data_fim_raw)
+        except ValueError:
+            pass
     fichas, total = list_fichas(db, filters, page, page_size)
     pagination = build_pagination(page, page_size, total)
     templates_list = list_templates(db)
@@ -354,7 +393,7 @@ def ficha_nova(request: Request, db: Session = Depends(get_db)):
     template = get_template(db, template_id) if template_id else None
     if manual and not template_id:
         template = get_or_create_manual_template(db, user)
-    templates_list = list_templates(db)
+    templates_list = list_templates(db, active_only=True)
 
     process_filters = {
         "numero": request.query_params.get("numero"),
@@ -366,6 +405,7 @@ def ficha_nova(request: Request, db: Session = Depends(get_db)):
     if not manual and not processo:
         processos, _ = list_processes(db, process_filters, 1, 20)
 
+    template_schema = normalize_template_schema(template.schema_json) if template else None
     return templates.TemplateResponse(
         "ficha_form.html",
         {
@@ -374,6 +414,7 @@ def ficha_nova(request: Request, db: Session = Depends(get_db)):
             "manual": manual,
             "processo": processo,
             "template": template,
+            "template_schema": template_schema,
             "templates_list": templates_list,
             "processos": processos,
             "process_filters": process_filters,
@@ -398,9 +439,12 @@ async def ficha_criar(request: Request, db: Session = Depends(get_db)):
     template = get_template(db, template_id) if template_id else None
     if manual and not template_id:
         template = get_or_create_manual_template(db, user)
-    templates_list = list_templates(db)
+    templates_list = list_templates(db, active_only=True)
 
     errors: dict[str, str] = {}
+    status_value = str(form_data.get("status") or "ativo").strip().lower()
+    if status_value not in {"ativo", "rascunho", "arquivado"}:
+        errors["status"] = "Status invalido"
     if not processo and not manual:
         errors["process_id"] = "Processo invalido"
     if not template:
@@ -413,9 +457,10 @@ async def ficha_criar(request: Request, db: Session = Depends(get_db)):
         errors.update(validation_errors_to_dict(exc))
 
     extras_json: dict[str, Any] = {}
+    template_schema: TemplateSchema | None = None
     if template and template.schema_json:
-        schema_fields = [TemplateField.model_validate(item) for item in template.schema_json]
-        extras_json, extra_errors = parse_extras(form_data, schema_fields)
+        template_schema = normalize_template_schema(template.schema_json)
+        extras_json, extra_errors = parse_extras(form_data, template_schema)
         for key, value in extra_errors.items():
             errors[f"extra__{key}"] = value
 
@@ -428,6 +473,7 @@ async def ficha_criar(request: Request, db: Session = Depends(get_db)):
                 "manual": manual,
                 "processo": processo,
                 "template": template,
+                "template_schema": template_schema,
                 "templates_list": templates_list,
                 "processos": [],
                 "process_filters": {},
@@ -449,9 +495,10 @@ async def ficha_criar(request: Request, db: Session = Depends(get_db)):
         extras_json,
         form_data.get("indexador"),
         form_data.get("observacoes"),
+        status_value,
         user,
     )
-    return RedirectResponse(f"/fichas/{ficha.id}", status_code=303)
+    return RedirectResponse(with_prefix(f"/fichas/{ficha.id}"), status_code=303)
 
 
 @router.get("/fichas/{ficha_id}")
@@ -461,10 +508,12 @@ def ficha_detail(ficha_id: str, request: Request, db: Session = Depends(get_db))
         return user
     ficha = get_ficha(db, ficha_id)
     if not ficha:
-        return RedirectResponse("/fichas", status_code=303)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
+    template_schema = normalize_template_schema(ficha.template.schema_json)
+    extras_map = build_template_field_map(template_schema)
     return templates.TemplateResponse(
         "ficha_detail.html",
-        {"request": request, "user": user, "ficha": ficha},
+        {"request": request, "user": user, "ficha": ficha, "template_schema": template_schema, "extras_map": extras_map},
     )
 
 
@@ -475,8 +524,9 @@ def ficha_editar(ficha_id: str, request: Request, db: Session = Depends(get_db))
         return user
     ficha = get_ficha(db, ficha_id)
     if not ficha:
-        return RedirectResponse("/fichas", status_code=303)
-    templates_list = list_templates(db)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
+    templates_list = list_templates(db, active_only=True)
+    template_schema = normalize_template_schema(ficha.template.schema_json)
     return templates.TemplateResponse(
         "ficha_form.html",
         {
@@ -485,6 +535,7 @@ def ficha_editar(ficha_id: str, request: Request, db: Session = Depends(get_db))
             "manual": False,
             "processo": ficha.process,
             "template": ficha.template,
+            "template_schema": template_schema,
             "templates_list": templates_list,
             "processos": [],
             "process_filters": {},
@@ -503,11 +554,14 @@ async def ficha_atualizar(ficha_id: str, request: Request, db: Session = Depends
         return user
     ficha = get_ficha(db, ficha_id)
     if not ficha:
-        return RedirectResponse("/fichas", status_code=303)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
 
     form = await request.form()
     form_data = dict(form)
     errors: dict[str, str] = {}
+    status_value = str(form_data.get("status") or ficha.status or "ativo").strip().lower()
+    if status_value not in {"ativo", "rascunho", "arquivado"}:
+        errors["status"] = "Status invalido"
 
     base_fields = None
     try:
@@ -515,13 +569,13 @@ async def ficha_atualizar(ficha_id: str, request: Request, db: Session = Depends
     except ValidationError as exc:
         errors.update(validation_errors_to_dict(exc))
 
-    schema_fields = [TemplateField.model_validate(item) for item in ficha.template.schema_json]
-    extras_json, extra_errors = parse_extras(form_data, schema_fields)
+    template_schema = normalize_template_schema(ficha.template.schema_json)
+    extras_json, extra_errors = parse_extras(form_data, template_schema)
     for key, value in extra_errors.items():
         errors[f"extra__{key}"] = value
 
     if errors:
-        templates_list = list_templates(db)
+        templates_list = list_templates(db, active_only=True)
         return templates.TemplateResponse(
             "ficha_form.html",
             {
@@ -530,6 +584,7 @@ async def ficha_atualizar(ficha_id: str, request: Request, db: Session = Depends
                 "manual": False,
                 "processo": ficha.process,
                 "template": ficha.template,
+                "template_schema": template_schema,
                 "templates_list": templates_list,
                 "processos": [],
                 "process_filters": {},
@@ -548,9 +603,10 @@ async def ficha_atualizar(ficha_id: str, request: Request, db: Session = Depends
         extras_json,
         form_data.get("indexador"),
         form_data.get("observacoes"),
+        status_value,
         user,
     )
-    return RedirectResponse(f"/fichas/{ficha.id}", status_code=303)
+    return RedirectResponse(with_prefix(f"/fichas/{ficha.id}"), status_code=303)
 
 
 @router.post("/fichas/{ficha_id}/excluir")
@@ -560,9 +616,9 @@ def ficha_excluir(ficha_id: str, request: Request, db: Session = Depends(get_db)
         return user
     ficha = get_ficha(db, ficha_id)
     if not ficha:
-        return RedirectResponse("/fichas", status_code=303)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
     delete_ficha(db, ficha, user)
-    return RedirectResponse("/fichas", status_code=303)
+    return RedirectResponse(with_prefix("/fichas"), status_code=303)
 
 
 @router.post("/fichas/{ficha_id}/anexos")
@@ -577,10 +633,10 @@ async def ficha_anexar(
         return user
     ficha = get_ficha(db, ficha_id)
     if not ficha:
-        return RedirectResponse("/fichas", status_code=303)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
 
     if not file.filename:
-        return RedirectResponse(f"/fichas/{ficha.id}", status_code=303)
+        return RedirectResponse(with_prefix(f"/fichas/{ficha.id}"), status_code=303)
 
     storage = get_storage_backend()
     result = storage.save(file)
@@ -593,7 +649,7 @@ async def ficha_anexar(
     )
     db.add(attachment)
     db.commit()
-    return RedirectResponse(f"/fichas/{ficha.id}", status_code=303)
+    return RedirectResponse(with_prefix(f"/fichas/{ficha.id}"), status_code=303)
 
 
 @router.get("/anexos/{attachment_id}")
@@ -603,7 +659,7 @@ def anexo_download(attachment_id: str, request: Request, db: Session = Depends(g
         return user
     attachment = db.execute(select(Attachment).where(Attachment.id == attachment_id)).scalar_one_or_none()
     if not attachment:
-        return RedirectResponse("/fichas", status_code=303)
+        return RedirectResponse(with_prefix("/fichas"), status_code=303)
 
     storage = get_storage_backend()
     download_url = storage.get_download_url(attachment.storage_key, attachment.filename)
@@ -632,6 +688,79 @@ def admin_templates_list(request: Request, db: Session = Depends(get_db)):
         "admin_templates_list.html",
         {"request": request, "user": user, "templates_list": templates_list},
     )
+
+
+@router.get("/admin/templates/importar")
+def admin_template_import_page(request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db, admin=True)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        "admin_template_import.html",
+        {"request": request, "user": user, "errors": {}, "message": None},
+    )
+
+
+@router.post("/admin/templates/importar")
+async def admin_template_import(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    user = ensure_user(request, db, admin=True)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not file.filename:
+        return templates.TemplateResponse(
+            "admin_template_import.html",
+            {"request": request, "user": user, "errors": {"file": "Arquivo invalido"}, "message": None},
+            status_code=400,
+        )
+
+    try:
+        payload = json.loads((await file.read()).decode("utf-8"))
+    except Exception:
+        return templates.TemplateResponse(
+            "admin_template_import.html",
+            {"request": request, "user": user, "errors": {"file": "JSON invalido"}, "message": None},
+            status_code=400,
+        )
+
+    try:
+        template, created = import_template_payload(db, payload, user)
+    except Exception as exc:
+        return templates.TemplateResponse(
+            "admin_template_import.html",
+            {"request": request, "user": user, "errors": {"file": str(exc)}, "message": None},
+            status_code=400,
+        )
+
+    if not created:
+        return templates.TemplateResponse(
+            "admin_template_import.html",
+            {
+                "request": request,
+                "user": user,
+                "errors": {},
+                "message": "Template ja existe para essa versao.",
+            },
+            status_code=200,
+        )
+
+    return RedirectResponse(with_prefix(f"/admin/templates/{template.id}/editar"), status_code=303)
+
+
+@router.post("/admin/templates/{template_id}/status")
+async def admin_template_status(template_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db, admin=True)
+    if isinstance(user, RedirectResponse):
+        return user
+    template = get_template(db, template_id)
+    if not template:
+        return RedirectResponse(with_prefix("/admin/templates"), status_code=303)
+
+    form = await request.form()
+    form_data = dict(form)
+    active_raw = str(form_data.get("active", "")).strip().lower()
+    active = active_raw in {"1", "true", "on", "yes"}
+    set_template_active(db, template, active, user)
+    return RedirectResponse(with_prefix("/admin/templates"), status_code=303)
 
 
 @router.get("/admin/templates/novo")
@@ -663,16 +792,27 @@ async def admin_template_criar(request: Request, db: Session = Depends(get_db)):
         )
 
     try:
-        template = create_template(db, data.nome, data.descricao, data.schema_text, user)
-    except Exception:
+        template = create_template(
+            db,
+            data.nome,
+            data.descricao,
+            data.schema_text,
+            user,
+            origem_pdf=data.origem_pdf,
+            versao=data.versao,
+            is_active=data.is_active,
+        )
+    except ValueError as exc:
         errors = {"schema_text": "Schema JSON invalido"}
+        if "versao" in str(exc).lower():
+            errors = {"versao": str(exc)}
         return templates.TemplateResponse(
             "admin_template_form.html",
             {"request": request, "user": user, "template": None, "form": form_data, "errors": errors},
             status_code=400,
         )
 
-    return RedirectResponse(f"/admin/templates/{template.id}/editar", status_code=303)
+    return RedirectResponse(with_prefix(f"/admin/templates/{template.id}/editar"), status_code=303)
 
 
 @router.get("/admin/templates/{template_id}/editar")
@@ -682,14 +822,20 @@ def admin_template_editar(template_id: str, request: Request, db: Session = Depe
         return user
     template = get_template(db, template_id)
     if not template:
-        return RedirectResponse("/admin/templates", status_code=303)
+        return RedirectResponse(with_prefix("/admin/templates"), status_code=303)
     return templates.TemplateResponse(
         "admin_template_form.html",
         {
             "request": request,
             "user": user,
             "template": template,
-            "form": {"schema_text": json.dumps(template.schema_json, indent=2)},
+            "form": {
+                "nome": template.nome,
+                "descricao": template.descricao,
+                "origem_pdf": template.origem_pdf,
+                "is_active": template.is_active,
+                "schema_text": json.dumps(template.schema_json, indent=2),
+            },
             "errors": {},
         },
     )
@@ -702,7 +848,7 @@ async def admin_template_atualizar(template_id: str, request: Request, db: Sessi
         return user
     template = get_template(db, template_id)
     if not template:
-        return RedirectResponse("/admin/templates", status_code=303)
+        return RedirectResponse(with_prefix("/admin/templates"), status_code=303)
 
     form = await request.form()
     form_data = dict(form)
@@ -717,13 +863,27 @@ async def admin_template_atualizar(template_id: str, request: Request, db: Sessi
         )
 
     try:
-        update_template(db, template, data.nome, data.descricao, data.schema_text, user)
-    except Exception:
+        if data.versao and data.versao <= template.versao:
+            raise ValueError("Versao deve ser maior que a atual")
+        template = create_template_version(
+            db,
+            template,
+            data.nome,
+            data.descricao,
+            data.schema_text,
+            user,
+            origem_pdf=data.origem_pdf,
+            is_active=data.is_active,
+            versao=data.versao,
+        )
+    except ValueError as exc:
         errors = {"schema_text": "Schema JSON invalido"}
+        if "versao" in str(exc).lower():
+            errors = {"versao": str(exc)}
         return templates.TemplateResponse(
             "admin_template_form.html",
             {"request": request, "user": user, "template": template, "form": form_data, "errors": errors},
             status_code=400,
         )
 
-    return RedirectResponse(f"/admin/templates/{template.id}/editar", status_code=303)
+    return RedirectResponse(with_prefix(f"/admin/templates/{template.id}/editar"), status_code=303)

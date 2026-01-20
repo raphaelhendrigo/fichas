@@ -39,12 +39,15 @@ setup_logging()
 
 app = FastAPI(title="Fichas TCM-SP", version="0.1.0")
 
-app.include_router(web_router)
-app.include_router(api_router, prefix="/api/v1")
+base_path = settings.APP_BASE_PATH
+app.include_router(web_router, prefix=base_path)
+api_prefix = f"{base_path}/api/v1" if base_path else "/api/v1"
+app.include_router(api_router, prefix=api_prefix)
 
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    static_prefix = f"{base_path}/static" if base_path else "/static"
+    app.mount(static_prefix, StaticFiles(directory=static_dir), name="static")
 
 
 @app.on_event("startup")

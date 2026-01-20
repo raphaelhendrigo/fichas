@@ -18,7 +18,7 @@
         <td class="px-4 py-3">{{ processo.assunto or '-' }}</td>
         <td class="px-4 py-3">{{ processo.created_at|format_datetime }}</td>
         <td class="px-4 py-3 text-right">
-          <a class="btn-secondary" href="/processos/{{ processo.id }}">Abrir</a>
+          <a class="btn-secondary" href="{{ url_path('/processos/' ~ processo.id) }}">Abrir</a>
         </td>
       </tr>
       {% endfor %}

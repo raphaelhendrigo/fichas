@@ -30,6 +30,7 @@ services:
       PORT: ${PORT:-8080}
     volumes:
       - ./data:/app/data
+      - ./templates_draft:/app/templates_draft
     depends_on:
       db:
         condition: service_healthy
@@ -59,6 +60,7 @@ services:
         condition: service_healthy
     environment:
       SERVER_NAME: ${SERVER_NAME:-lab.engenhodigitalweb.com.br}
+      APP_BASE_PATH: ${APP_BASE_PATH:-/}
       ENABLE_HTTPS: ${ENABLE_HTTPS:-true}
       ENABLE_BASIC_AUTH: ${ENABLE_BASIC_AUTH:-false}
       BASIC_AUTH_FILE: /etc/nginx/htpasswd/htpasswd

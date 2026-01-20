@@ -97,12 +97,12 @@
             </div>
           </div>
           <nav class="flex flex-wrap items-center gap-2 text-sm">
-            <a class="nav-link" href="/">Dashboard</a>
-            <a class="nav-link" href="/processos">Processos</a>
-            <a class="nav-link" href="/fichas">Fichas</a>
-            <a class="nav-link" href="/admin/templates">Templates</a>
-            <a class="nav-link" href="/saiba-mais">Saiba mais</a>
-            <form method="post" action="/logout">
+            <a class="nav-link" href="{{ url_path('/') }}">Dashboard</a>
+            <a class="nav-link" href="{{ url_path('/processos') }}">Processos</a>
+            <a class="nav-link" href="{{ url_path('/fichas') }}">Fichas</a>
+            <a class="nav-link" href="{{ url_path('/admin/templates') }}">Templates</a>
+            <a class="nav-link" href="{{ url_path('/saiba-mais') }}">Saiba mais</a>
+            <form method="post" action="{{ url_path('/logout') }}">
               <button class="btn-secondary" type="submit">Sair</button>
             </form>
           </nav>

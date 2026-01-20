@@ -3,7 +3,10 @@
 {% block content %}
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">Templates</h1>
-  <a class="btn-primary" href="/admin/templates/novo">Novo template</a>
+  <div class="flex items-center gap-2">
+    <a class="btn-secondary" href="{{ url_path('/admin/templates/importar') }}">Importar JSON</a>
+    <a class="btn-primary" href="{{ url_path('/admin/templates/novo') }}">Novo template</a>
+  </div>
 </div>
 
 <div class="mt-6 card overflow-hidden">
@@ -11,6 +14,9 @@
     <thead class="bg-slate-50 text-left">
       <tr>
         <th class="px-4 py-3">Nome</th>
+        <th class="px-4 py-3">Versao</th>
+        <th class="px-4 py-3">Origem</th>
+        <th class="px-4 py-3">Status</th>
         <th class="px-4 py-3">Descricao</th>
         <th class="px-4 py-3"></th>
       </tr>
@@ -19,9 +25,22 @@
       {% for template in templates_list %}
       <tr>
         <td class="px-4 py-3 font-medium">{{ template.nome }}</td>
+        <td class="px-4 py-3">v{{ template.versao }}</td>
+        <td class="px-4 py-3">{{ template.origem_pdf or '-' }}</td>
+        <td class="px-4 py-3">
+          <span class="rounded-full px-2 py-1 text-xs {% if template.is_active %}bg-emerald-50 text-emerald-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+            {{ 'Ativo' if template.is_active else 'Inativo' }}
+          </span>
+        </td>
         <td class="px-4 py-3">{{ template.descricao or '-' }}</td>
         <td class="px-4 py-3 text-right">
-          <a class="btn-secondary" href="/admin/templates/{{ template.id }}/editar">Editar</a>
+          <div class="flex items-center justify-end gap-2">
+            <a class="btn-secondary" href="{{ url_path('/admin/templates/' ~ template.id ~ '/editar') }}">Editar</a>
+            <form method="post" action="{{ url_path('/admin/templates/' ~ template.id ~ '/status') }}">
+              <input type="hidden" name="active" value="{{ '0' if template.is_active else '1' }}" />
+              <button class="btn-secondary" type="submit">{{ 'Desativar' if template.is_active else 'Ativar' }}</button>
+            </form>
+          </div>
         </td>
       </tr>
       {% endfor %}

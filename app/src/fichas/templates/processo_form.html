@@ -5,7 +5,7 @@
 {% block content %}
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">{{ 'Editar processo' if is_edit else 'Novo processo' }}</h1>
-  <a class="btn-secondary" href="/processos">Voltar</a>
+  <a class="btn-secondary" href="{{ url_path('/processos') }}">Voltar</a>
 </div>
 
 <form class="mt-6 space-y-4" method="post">

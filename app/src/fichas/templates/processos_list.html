@@ -3,12 +3,12 @@
 {% block content %}
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">Processos</h1>
-  <a class="btn-primary" href="/processos/novo">Novo processo</a>
+  <a class="btn-primary" href="{{ url_path('/processos/novo') }}">Novo processo</a>
 </div>
 
 <form
   class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-4"
-  hx-get="/processos"
+  hx-get="{{ url_path('/processos') }}"
   hx-target="#processo-list"
   hx-trigger="keyup changed delay:350ms from:input, change from:select"
   hx-push-url="true"

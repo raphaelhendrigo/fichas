@@ -5,10 +5,15 @@
 {% block content %}
 <div class="flex items-center justify-between">
   <h1 class="text-2xl font-semibold">{{ 'Editar template' if is_edit else 'Novo template' }}</h1>
-  <a class="btn-secondary" href="/admin/templates">Voltar</a>
+  <a class="btn-secondary" href="{{ url_path('/admin/templates') }}">Voltar</a>
 </div>
 
 <form class="mt-6 space-y-4" method="post">
+  {% if is_edit %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+    Versao atual: <strong>v{{ template.versao }}</strong>. Ao salvar, uma nova versao sera criada.
+  </div>
+  {% endif %}
   <div>
     <label class="text-sm font-medium">Nome</label>
     <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="nome" value="{{ form.nome or template.nome if template else form.nome or '' }}" />
@@ -20,13 +25,35 @@
     <label class="text-sm font-medium">Descricao</label>
     <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="descricao" value="{{ form.descricao or template.descricao if template else form.descricao or '' }}" />
   </div>
+  <div class="grid gap-4 md:grid-cols-3">
+    <div>
+      <label class="text-sm font-medium">Origem PDF</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="origem_pdf" value="{{ form.origem_pdf or template.origem_pdf if template else form.origem_pdf or '' }}" />
+    </div>
+    <div>
+      <label class="text-sm font-medium">Versao (opcional)</label>
+      <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="versao" value="{{ form.versao or '' }}" />
+      {% if errors and errors.get('versao') %}
+      <p class="text-sm text-red-600">{{ errors.get('versao') }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <label class="text-sm font-medium">Status</label>
+      {% set active_value = form.is_active if form.is_active is defined else (template.is_active if template else true) %}
+      {% set active_bool = active_value in [true, 'true', '1', 1] %}
+      <select class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="is_active">
+        <option value="true" {% if active_bool %}selected{% endif %}>Ativo</option>
+        <option value="false" {% if not active_bool %}selected{% endif %}>Inativo</option>
+      </select>
+    </div>
+  </div>
   <div>
     <label class="text-sm font-medium">Schema JSON</label>
     <textarea class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm" name="schema_text" rows="10">{{ form.schema_text or (template.schema_json | tojson(indent=2)) if template else form.schema_text or '' }}</textarea>
     {% if errors and errors.get('schema_text') %}
     <p class="text-sm text-red-600">{{ errors.get('schema_text') }}</p>
     {% endif %}
-    <p class="mt-2 text-xs text-slate-500">Formato: lista de campos com name, label, type, required, hint.</p>
+    <p class="mt-2 text-xs text-slate-500">Formato: objeto com sections, cada section com fields (id, label, type, required, validations, layout).</p>
   </div>
   <button class="btn-primary" type="submit">Salvar</button>
 </form>

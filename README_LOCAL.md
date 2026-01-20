@@ -1,8 +1,8 @@
 # README_LOCAL.md
 
-Este guia prepara o ambiente local (Windows 11 + Docker Desktop) com HTTPS e subdominio de testes:
-`https://lab.engenhodigitalweb.com.br/`
-Nao altera o dominio principal `https://www.engenhodigitalweb.com.br/`.
+Este guia prepara o ambiente local (Windows 11 + Docker Desktop) com HTTPS no dominio:
+`https://www.raphaelhendrigo.com.br/fichas` (APP_BASE_PATH=/fichas)
+Alternativa: `https://fichas.raphaelhendrigo.com.br/` (APP_BASE_PATH=).
 
 ## 1) Requisitos
 - Docker Desktop (com suporte a `docker compose`)
@@ -16,6 +16,8 @@ Nao altera o dominio principal `https://www.engenhodigitalweb.com.br/`.
    - `SECRET_KEY` (obrigatorio)
    - `COOKIE_SECURE=true` quando estiver usando HTTPS
    - `STORAGE_BACKEND=local`
+   - `APP_BASE_PATH=/fichas` (ou vazio para subdominio)
+   - `SERVER_NAME=www.raphaelhendrigo.com.br` (ou `fichas.raphaelhendrigo.com.br`)
 3) Suba os containers:
    `docker compose up -d --build`
 4) Rode migrations e seed:
@@ -23,8 +25,9 @@ Nao altera o dominio principal `https://www.engenhodigitalweb.com.br/`.
    `docker compose exec app python scripts/seed_admin_and_templates.py`
 
 Acesso local:
-- HTTP: `http://localhost`
-- HTTPS (autoassinado ate gerar o Let's Encrypt): `https://localhost`
+- HTTP: `http://localhost/fichas` (ou `http://localhost/` se APP_BASE_PATH vazio)
+- HTTPS (autoassinado ate gerar o Let's Encrypt): `https://localhost/fichas` (ou `/`)
+Com APP_BASE_PATH=/fichas, as rotas ficam em `/fichas/...` (ex.: `/fichas/fichas`).
 O Nginx gera certificado autoassinado quando nao encontra o Let's Encrypt em `certs/`.
 
 ## 3) Protecao opcional com Basic Auth
@@ -43,8 +46,8 @@ Exemplo (uma vez):
 ```
 $env:CLOUDFLARE_API_TOKEN="..."
 $env:CLOUDFLARE_ZONE_ID="..."
-$env:CLOUDFLARE_ZONE_NAME="engenhodigitalweb.com.br"
-$env:CLOUDFLARE_RECORD_NAME="lab"
+$env:CLOUDFLARE_ZONE_NAME="raphaelhendrigo.com.br"
+$env:CLOUDFLARE_RECORD_NAME="www"
 $env:CLOUDFLARE_RECORD_CONTENT="SEU_IP_PUBLICO"
 $env:CLOUDFLARE_TTL="120"
 $env:CLOUDFLARE_PROXIED="false"
@@ -55,6 +58,7 @@ DDNS (atualizacao automatica do IP):
 .\scripts\ddns_cloudflare.ps1
 ```
 Se o DNS estiver na Locaweb, crie o registro manualmente (TTL fixo 3600). Veja `DNS_MANUAL.md`.
+Para usar subdominio (ex.: `fichas.raphaelhendrigo.com.br`), ajuste `CLOUDFLARE_RECORD_NAME` e `SERVER_NAME`.
 
 ### 4.2 Port-forward no roteador
 Redirecione:
@@ -63,7 +67,7 @@ Redirecione:
 
 ### 4.3 Certificado Let's Encrypt (HTTP-01)
 ```
-docker compose --profile letsencrypt run --rm certbot certonly --webroot -w /var/www/certbot -d lab.engenhodigitalweb.com.br --email SEU_EMAIL --agree-tos --no-eff-email
+docker compose --profile letsencrypt run --rm certbot certonly --webroot -w /var/www/certbot -d www.raphaelhendrigo.com.br --email SEU_EMAIL --agree-tos --no-eff-email
 docker compose restart nginx
 ```
 
@@ -72,7 +76,7 @@ Use o plugin `dns-cloudflare`:
 ```
 New-Item -ItemType Directory -Force -Path .secrets | Out-Null
 "dns_cloudflare_api_token = SEU_TOKEN" | Set-Content -Path .\.secrets\cloudflare.ini -NoNewline -Encoding ascii
-docker run --rm -v ${PWD}/certs:/etc/letsencrypt -v ${PWD}/.secrets:/secrets certbot/dns-cloudflare certonly --dns-cloudflare --dns-cloudflare-credentials /secrets/cloudflare.ini -d lab.engenhodigitalweb.com.br --email SEU_EMAIL --agree-tos --no-eff-email
+docker run --rm -v ${PWD}/certs:/etc/letsencrypt -v ${PWD}/.secrets:/secrets certbot/dns-cloudflare certonly --dns-cloudflare --dns-cloudflare-credentials /secrets/cloudflare.ini -d www.raphaelhendrigo.com.br --email SEU_EMAIL --agree-tos --no-eff-email
 docker compose restart nginx
 ```
 
@@ -82,9 +86,9 @@ docker compose restart nginx
 $env:CLOUDFLARE_API_TOKEN="..."
 $env:CLOUDFLARE_ACCOUNT_ID="..."
 $env:CLOUDFLARE_ZONE_ID="..."
-$env:CLOUDFLARE_ZONE_NAME="engenhodigitalweb.com.br"
-$env:CLOUDFLARE_RECORD_NAME="lab"
-$env:CLOUDFLARE_TUNNEL_NAME="engenhodigitalweb-lab"
+$env:CLOUDFLARE_ZONE_NAME="raphaelhendrigo.com.br"
+$env:CLOUDFLARE_RECORD_NAME="www"
+$env:CLOUDFLARE_TUNNEL_NAME="raphaelhendrigo-fichas"
 $env:CLOUDFLARE_PROXIED="true"
 ```
 2) Crie o tunnel e o DNS:
@@ -104,6 +108,53 @@ docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
 O token fica em `.secrets/tunnel_token.txt` e consumido pelo compose.
 
 Opcional: use Basic Auth no Nginx ou habilite Cloudflare Access no painel do Cloudflare.
+
+## 5.1) Deploy remoto via SSH (Cloudflare Access)
+Objetivo: atualizar o PC de casa a partir de outro computador sem abrir portas.
+
+No PC de casa (uma vez):
+1) Habilite o OpenSSH Server:
+```
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Start-Service sshd
+Set-Service sshd -StartupType Automatic
+```
+2) Crie/autorize a chave SSH do PC remoto:
+- No PC do trabalho:
+  `ssh-keygen -t ed25519`
+- No PC de casa:
+  copie o conteudo de `id_ed25519.pub` para `C:\Users\SEU_USUARIO\.ssh\authorized_keys`.
+3) Cloudflare Zero Trust:
+- Se o tunnel estiver como "local", migre (irreversivel) ou crie um novo tunnel gerenciado.
+- Adicione um Public Hostname para SSH:
+  - `ssh.raphaelhendrigo.com.br` -> `ssh://localhost:22` (cloudflared no Windows).
+  - Se o cloudflared roda em container: use `ssh://host.docker.internal:22`.
+- Crie uma politica Access permitindo seu e-mail.
+4) O tunnel deve rodar no PC de casa (nao no PC do trabalho).
+
+No PC do trabalho:
+1) Instale o cloudflared:
+```
+winget install Cloudflare.cloudflared
+```
+2) Configure `~/.ssh/config`:
+```
+Host casa-fichas
+  HostName ssh.raphaelhendrigo.com.br
+  User SEU_USUARIO
+  ProxyCommand "C:\Program Files (x86)\cloudflared\cloudflared.exe" access ssh --hostname %h
+```
+3) Teste:
+```
+ssh casa-fichas
+```
+4) Deploy remoto:
+```
+.\scripts\deploy_remote.ps1 -Host casa-fichas -Path "D:\OneDrive - tcm.sp.gov.br\Fichas"
+```
+Variaveis opcionais:
+- `DEPLOY_SSH_HOST`, `DEPLOY_APP_PATH`, `DEPLOY_BRANCH`
+- `-SkipMigrations` (para pular `alembic upgrade head`)
 
 ## 6) Comandos rapidos (PowerShell)
 Build + Up:

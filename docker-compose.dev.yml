@@ -5,3 +5,4 @@ services:
       - "8080:8080"
     volumes:
       - ./app:/app
+      - ./templates_draft:/app/templates_draft

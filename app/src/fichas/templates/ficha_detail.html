@@ -4,11 +4,15 @@
 <div class="flex items-center justify-between">
   <div>
     <h1 class="text-2xl font-semibold">Ficha {{ ficha.id }}</h1>
-    <p class="text-sm text-slate-600">Template: {{ ficha.template.nome }}</p>
+    <p class="text-sm text-slate-600">Template: {{ ficha.template.nome }} v{{ ficha.template.versao }}</p>
+    {% if ficha.template.origem_pdf %}
+    <p class="text-xs text-slate-500">Origem: {{ ficha.template.origem_pdf }}</p>
+    {% endif %}
+    <p class="text-xs text-slate-500">Status: {{ ficha.status }}</p>
   </div>
   <div class="flex gap-2">
-    <a class="btn-secondary" href="/fichas/{{ ficha.id }}/editar">Editar</a>
-    <form method="post" action="/fichas/{{ ficha.id }}/excluir" onsubmit="return confirm('Excluir esta ficha?');">
+    <a class="btn-secondary" href="{{ url_path('/fichas/' ~ ficha.id ~ '/editar') }}">Editar</a>
+    <form method="post" action="{{ url_path('/fichas/' ~ ficha.id ~ '/excluir') }}" onsubmit="return confirm('Excluir esta ficha?');">
       <button class="btn-danger" type="submit">Excluir</button>
     </form>
   </div>
@@ -19,7 +23,7 @@
     <h2 class="text-lg font-semibold">Campos base (snapshot)</h2>
     <dl class="mt-4 space-y-2 text-sm">
       {% for key, value in ficha.campos_base_json.items() %}
-      <div><strong>{{ key }}:</strong> {{ value or '-' }}</div>
+      <div><strong>{{ key }}:</strong> {{ value if value is not none else '-' }}</div>
       {% endfor %}
     </dl>
   </div>
@@ -28,7 +32,8 @@
     {% if ficha.extras_json %}
     <dl class="mt-4 space-y-2 text-sm">
       {% for key, value in ficha.extras_json.items() %}
-      <div><strong>{{ key }}:</strong> {{ value or '-' }}</div>
+      {% set field = extras_map.get(key) if extras_map is defined else None %}
+      <div><strong>{{ field.label if field else key }}:</strong> {{ value if value is not none else '-' }}</div>
       {% endfor %}
     </dl>
     {% else %}
@@ -44,7 +49,7 @@
   </div>
   <div class="card p-6">
     <h2 class="text-lg font-semibold">Anexos</h2>
-    <form class="mt-4 flex items-center gap-2" method="post" enctype="multipart/form-data" action="/fichas/{{ ficha.id }}/anexos">
+    <form class="mt-4 flex items-center gap-2" method="post" enctype="multipart/form-data" action="{{ url_path('/fichas/' ~ ficha.id ~ '/anexos') }}">
       <input type="file" name="file" class="text-sm" />
       <button class="btn-primary" type="submit">Enviar</button>
     </form>
@@ -52,7 +57,7 @@
       {% for attachment in ficha.attachments %}
       <li class="flex items-center justify-between">
         <span>{{ attachment.filename }}</span>
-        <a class="btn-secondary" href="/anexos/{{ attachment.id }}">Abrir</a>
+        <a class="btn-secondary" href="{{ url_path('/anexos/' ~ attachment.id) }}">Abrir</a>
       </li>
       {% else %}
       <li class="text-slate-600">Sem anexos.</li>

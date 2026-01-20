@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -83,13 +84,29 @@ def api_list_fichas(
 ):
     page = int(request.query_params.get("page", "1"))
     page_size = int(request.query_params.get("page_size", "20"))
+    data_inicio = request.query_params.get("data_inicio")
+    data_fim = request.query_params.get("data_fim")
     filters = {
+        "q": request.query_params.get("q"),
         "numero": request.query_params.get("numero"),
         "ano": request.query_params.get("ano"),
         "interessado": request.query_params.get("interessado"),
         "assunto": request.query_params.get("assunto"),
         "template_id": request.query_params.get("template_id"),
+        "status": request.query_params.get("status"),
+        "data_inicio": None,
+        "data_fim": None,
     }
+    if data_inicio:
+        try:
+            filters["data_inicio"] = date.fromisoformat(data_inicio)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            filters["data_fim"] = date.fromisoformat(data_fim)
+        except ValueError:
+            pass
     items, total = list_fichas(db, filters, page, page_size)
     return {
         "items": [FichaOut.model_validate(item).model_dump() for item in items],
