@@ -60,6 +60,10 @@
         transform: translateY(-1px);
         box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);
       }
+      .btn-primary-lg {
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+      }
       .btn-secondary {
         background: white;
         border: 1px solid rgba(148, 163, 184, 0.6);
@@ -67,6 +71,11 @@
         padding: 0.55rem 1rem;
         border-radius: 0.9rem;
         font-weight: 600;
+        transition: background 0.2s ease, border-color 0.2s ease;
+      }
+      .btn-secondary:hover {
+        background: var(--accent-soft);
+        border-color: rgba(15, 118, 110, 0.35);
       }
       .btn-danger {
         background: #b91c1c;
@@ -79,6 +88,14 @@
       .btn-danger:hover {
         transform: translateY(-1px);
         box-shadow: 0 10px 22px rgba(185, 28, 28, 0.25);
+      }
+      a:focus-visible,
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
     </style>
   </head>
@@ -96,16 +113,23 @@
               <div class="text-sm text-slate-600">Cadastro de fichas de processos</div>
             </div>
           </div>
-          <nav class="flex flex-wrap items-center gap-2 text-sm">
-            <a class="nav-link" href="{{ url_path('/') }}">Dashboard</a>
-            <a class="nav-link" href="{{ url_path('/processos') }}">Processos</a>
-            <a class="nav-link" href="{{ url_path('/fichas') }}">Fichas</a>
-            <a class="nav-link" href="{{ url_path('/admin/templates') }}">Templates</a>
-            <a class="nav-link" href="{{ url_path('/saiba-mais') }}">Saiba mais</a>
-            <form method="post" action="{{ url_path('/logout') }}">
-              <button class="btn-secondary" type="submit">Sair</button>
-            </form>
-          </nav>
+          <div class="flex flex-wrap items-center gap-3">
+            <nav class="flex flex-wrap items-center gap-2 text-sm">
+              <a class="nav-link" href="{{ url_path('/') }}">Dashboard</a>
+              <a class="nav-link" href="{{ url_path('/processos') }}">Processos</a>
+              <a class="nav-link" href="{{ url_path('/fichas') }}">Fichas</a>
+              {% if user is defined and user and user.is_admin %}
+              <a class="nav-link" href="{{ url_path('/admin/templates') }}">Templates</a>
+              {% endif %}
+              <a class="nav-link" href="{{ url_path('/saiba-mais') }}">Saiba mais</a>
+            </nav>
+            <div class="flex flex-wrap items-center gap-2">
+              <a class="btn-primary" href="{{ url_path('/fichas/nova') }}">Nova ficha</a>
+              <form method="post" action="{{ url_path('/logout') }}">
+                <button class="btn-secondary" type="submit">Sair</button>
+              </form>
+            </div>
+          </div>
         </header>
         {% endif %}
         <main class="py-8">

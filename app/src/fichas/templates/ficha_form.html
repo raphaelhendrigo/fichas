@@ -2,15 +2,14 @@
 
 {% block content %}
 {% if processo is none and ficha is not defined and not manual %}
-<div class="flex items-center justify-between">
-  <h1 class="text-2xl font-semibold">Selecionar processo</h1>
-</div>
-
-<div class="mt-4 flex flex-wrap items-center gap-2">
-  <a class="btn-primary" href="{{ url_path('/fichas/nova') }}?manual=1">Novo</a>
-  <button class="btn-secondary cursor-not-allowed opacity-50" type="button" disabled>Salvar</button>
-  <button class="btn-danger cursor-not-allowed opacity-50" type="button" disabled>Deletar</button>
-  <button class="btn-secondary" type="submit" form="process-search-form">Buscar</button>
+<div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold">Nova ficha</h1>
+    <p class="mt-1 text-sm text-slate-600">1) Escolha o template. 2) Selecione o processo.</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <a class="btn-primary" href="{{ url_path('/fichas/nova') }}?manual=1{% if template %}&template_id={{ template.id }}{% endif %}">Novo</a>
+  </div>
 </div>
 
 {% if errors %}
@@ -19,37 +18,84 @@
 </div>
 {% endif %}
 
-<form id="process-search-form" class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-4" method="get">
-  <input class="rounded-xl border border-slate-200 px-3 py-2" name="numero" placeholder="Numero ou chave" value="{{ process_filters.numero or '' }}" />
-  <input class="rounded-xl border border-slate-200 px-3 py-2" name="ano" placeholder="Ano" value="{{ process_filters.ano or '' }}" />
-  <input class="rounded-xl border border-slate-200 px-3 py-2" name="interessado" placeholder="Interessado" value="{{ process_filters.interessado or '' }}" />
-  <input class="rounded-xl border border-slate-200 px-3 py-2" name="assunto" placeholder="Assunto" value="{{ process_filters.assunto or '' }}" />
-  <button class="btn-primary md:col-span-4" type="submit">Buscar</button>
-</form>
-
-<div class="mt-6 card overflow-hidden">
-  <table class="min-w-full divide-y divide-slate-200 text-sm">
-    <thead class="bg-slate-50 text-left">
-      <tr>
-        <th class="px-4 py-3">Processo</th>
-        <th class="px-4 py-3">Interessado</th>
-        <th class="px-4 py-3">Assunto</th>
-        <th class="px-4 py-3"></th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100 bg-white">
-      {% for item in processos %}
-      <tr>
-        <td class="px-4 py-3 font-medium">{{ process_label(item) }}</td>
-        <td class="px-4 py-3">{{ item.interessado or '-' }}</td>
-        <td class="px-4 py-3">{{ item.assunto or '-' }}</td>
-        <td class="px-4 py-3 text-right">
-          <a class="btn-secondary" href="{{ url_path('/fichas/nova') }}?process_id={{ item.id }}">Selecionar</a>
-        </td>
-      </tr>
+<div class="mt-6 card p-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-semibold">1) Escolher template</h2>
+      <p class="mt-1 text-sm text-slate-600">O template define os campos extras da ficha.</p>
+    </div>
+  </div>
+  {% if templates_list %}
+  <form class="mt-4 flex flex-wrap items-center gap-3" method="get" action="{{ url_path('/fichas/nova') }}">
+    {% if process_filters.numero %}<input type="hidden" name="numero" value="{{ process_filters.numero }}" />{% endif %}
+    {% if process_filters.ano %}<input type="hidden" name="ano" value="{{ process_filters.ano }}" />{% endif %}
+    {% if process_filters.interessado %}<input type="hidden" name="interessado" value="{{ process_filters.interessado }}" />{% endif %}
+    {% if process_filters.assunto %}<input type="hidden" name="assunto" value="{{ process_filters.assunto }}" />{% endif %}
+    <label class="text-sm font-medium" for="template_id_select">Template</label>
+    <select class="rounded-xl border border-slate-200 px-3 py-2" id="template_id_select" name="template_id">
+      <option value="">Selecione</option>
+      {% for t in templates_list %}
+      <option value="{{ t.id }}" {% if template and t.id == template.id %}selected{% endif %}>{{ t.nome }} v{{ t.versao }}</option>
       {% endfor %}
-    </tbody>
-  </table>
+    </select>
+    <button class="btn-secondary" type="submit">Aplicar template</button>
+  </form>
+  {% if template %}
+  <p class="mt-3 text-sm text-slate-600">Selecionado: <strong>{{ template.nome }} v{{ template.versao }}</strong></p>
+  {% endif %}
+  {% if errors and errors.get('template_id') %}
+  <p class="mt-2 text-sm text-red-600">{{ errors.get('template_id') }}</p>
+  {% endif %}
+  {% else %}
+  <p class="mt-3 text-sm text-slate-600">Nenhum template ativo disponivel no momento.</p>
+  {% endif %}
+</div>
+
+<div class="mt-6 card p-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-semibold">2) Selecionar processo</h2>
+      <p class="mt-1 text-sm text-slate-600">Busque o processo para vincular a ficha.</p>
+    </div>
+  </div>
+  <form
+    id="process-search-form"
+    class="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-4"
+    method="get"
+    action="{{ url_path('/fichas/nova') }}"
+  >
+    {% if template %}<input type="hidden" name="template_id" value="{{ template.id }}" />{% endif %}
+    <input class="rounded-xl border border-slate-200 px-3 py-2" name="numero" placeholder="Numero ou chave" value="{{ process_filters.numero or '' }}" />
+    <input class="rounded-xl border border-slate-200 px-3 py-2" name="ano" placeholder="Ano" value="{{ process_filters.ano or '' }}" />
+    <input class="rounded-xl border border-slate-200 px-3 py-2" name="interessado" placeholder="Interessado" value="{{ process_filters.interessado or '' }}" />
+    <input class="rounded-xl border border-slate-200 px-3 py-2" name="assunto" placeholder="Assunto" value="{{ process_filters.assunto or '' }}" />
+    <button class="btn-primary md:col-span-4" type="submit">Buscar processos</button>
+  </form>
+
+  <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <thead class="bg-slate-50 text-left">
+        <tr>
+          <th class="px-4 py-3">Processo</th>
+          <th class="px-4 py-3">Interessado</th>
+          <th class="px-4 py-3">Assunto</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+        {% for item in processos %}
+        <tr>
+          <td class="px-4 py-3 font-medium">{{ process_label(item) }}</td>
+          <td class="px-4 py-3">{{ item.interessado or '-' }}</td>
+          <td class="px-4 py-3">{{ item.assunto or '-' }}</td>
+          <td class="px-4 py-3 text-right">
+            <a class="btn-secondary" href="{{ url_path('/fichas/nova') }}?process_id={{ item.id }}{% if template %}&template_id={{ template.id }}{% endif %}">Selecionar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
 {% set is_edit = ficha is defined %}

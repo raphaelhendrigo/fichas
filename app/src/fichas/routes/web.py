@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from fichas import __version__
 from fichas.auth import (
@@ -194,6 +194,26 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     processos_total = db.execute(select(func.count()).select_from(Process)).scalar_one()
     fichas_total = db.execute(select(func.count()).select_from(Ficha)).scalar_one()
     templates_total = db.execute(select(func.count()).select_from(FichaTemplate)).scalar_one()
+    active_templates = (
+        db.execute(
+            select(FichaTemplate)
+            .where(FichaTemplate.is_active.is_(True))
+            .order_by(FichaTemplate.nome.asc(), FichaTemplate.versao.desc())
+            .limit(6)
+        )
+        .scalars()
+        .all()
+    )
+    recent_fichas = (
+        db.execute(
+            select(Ficha)
+            .options(selectinload(Ficha.process), selectinload(Ficha.template))
+            .order_by(Ficha.created_at.desc())
+            .limit(5)
+        )
+        .scalars()
+        .all()
+    )
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -202,6 +222,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "processos_total": processos_total,
             "fichas_total": fichas_total,
             "templates_total": templates_total,
+            "active_templates": active_templates,
+            "recent_fichas": recent_fichas,
         },
     )
 

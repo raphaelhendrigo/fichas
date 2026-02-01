@@ -1,36 +1,122 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid gap-6 md:grid-cols-3">
-  <div class="card p-6">
+<section class="card p-6 md:p-10">
+  <div class="flex flex-col gap-6">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-slate-500">Dashboard</p>
+      <h1 class="mt-2 text-3xl font-semibold md:text-4xl">Cadastre fichas com foco e rapidez</h1>
+      <p class="mt-3 text-sm text-slate-600 md:text-base">
+        Comece cadastrando uma nova ficha ou selecione um template pronto para acelerar o preenchimento.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <a class="btn-primary btn-primary-lg" href="{{ url_path('/fichas/nova') }}">Cadastrar nova ficha</a>
+      <a class="btn-secondary" href="#templates-prontos">Escolher templates prontos</a>
+      <a class="btn-secondary" href="{{ url_path('/fichas') }}">Buscar fichas</a>
+      <a class="btn-secondary" href="{{ url_path('/processos') }}">Buscar processos</a>
+      {% if user.is_admin %}
+      <a class="btn-secondary" href="{{ url_path('/admin/templates/novo') }}">Cadastrar novo template</a>
+      <a class="btn-secondary" href="{{ url_path('/admin/templates') }}">Gerenciar templates</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="mt-8 grid gap-4 md:grid-cols-4">
+  <a
+    class="card group p-6 transition hover:-translate-y-0.5 hover:shadow-lg md:col-span-2"
+    href="{{ url_path('/fichas') }}"
+    style="border: 2px solid var(--accent); background: var(--accent-soft);"
+  >
+    <div class="text-sm uppercase tracking-wide text-slate-600">Fichas cadastradas</div>
+    <div class="mt-4 text-4xl font-semibold text-[var(--accent)] md:text-5xl">{{ fichas_total }}</div>
+    <div class="mt-2 text-sm text-slate-600">Acompanhe e revise todas as fichas.</div>
+  </a>
+  <a class="card p-5 transition hover:-translate-y-0.5 hover:shadow-lg" href="{{ url_path('/processos') }}">
     <div class="text-sm uppercase tracking-wide text-slate-500">Processos</div>
     <div class="mt-3 text-3xl font-semibold">{{ processos_total }}</div>
-  </div>
-  <div class="card p-6">
-    <div class="text-sm uppercase tracking-wide text-slate-500">Fichas</div>
-    <div class="mt-3 text-3xl font-semibold">{{ fichas_total }}</div>
-  </div>
-  <div class="card p-6">
+    <div class="mt-2 text-sm text-slate-600">Organize processos antes de cadastrar.</div>
+  </a>
+  <a
+    class="card p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+    href="{{ url_path('/admin/templates') if user.is_admin else url_path('/fichas/nova') }}"
+  >
     <div class="text-sm uppercase tracking-wide text-slate-500">Templates</div>
     <div class="mt-3 text-3xl font-semibold">{{ templates_total }}</div>
+    <div class="mt-2 text-sm text-slate-600">Use templates ativos para acelerar.</div>
+  </a>
+</section>
+
+<section id="templates-prontos" class="mt-10">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-semibold">Templates prontos</h2>
+      <p class="mt-1 text-sm text-slate-600">Escolha um template ativo para iniciar a ficha rapidamente.</p>
+    </div>
+    {% if user.is_admin %}
+    <a class="btn-secondary" href="{{ url_path('/admin/templates') }}">Gerenciar templates</a>
+    {% endif %}
   </div>
-</div>
-<div class="mt-8 grid gap-4 md:grid-cols-3">
-  <a class="card p-5 transition hover:-translate-y-0.5" href="{{ url_path('/processos/novo') }}">
-    <h3 class="text-lg font-semibold">Novo processo</h3>
-    <p class="mt-2 text-sm text-slate-600">Cadastre um processo consolidado.</p>
-  </a>
-  <a class="card p-5 transition hover:-translate-y-0.5" href="{{ url_path('/fichas/nova') }}">
-    <h3 class="text-lg font-semibold">Nova ficha</h3>
-    <p class="mt-2 text-sm text-slate-600">Crie ficha a partir de um processo.</p>
-  </a>
-  <a class="card p-5 transition hover:-translate-y-0.5" href="{{ url_path('/admin/templates/novo') }}">
-    <h3 class="text-lg font-semibold">Novo template</h3>
-    <p class="mt-2 text-sm text-slate-600">Defina campos extras.</p>
-  </a>
-  <a class="card p-5 transition hover:-translate-y-0.5" href="{{ url_path('/saiba-mais') }}">
-    <h3 class="text-lg font-semibold">Saiba mais</h3>
-    <p class="mt-2 text-sm text-slate-600">Resumo de arquivistica e tipos de arquivo.</p>
-  </a>
-</div>
+  {% if active_templates %}
+  <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {% for template in active_templates %}
+    <div class="card p-5">
+      <div class="text-xs uppercase tracking-wide text-slate-500">Versao {{ template.versao }}</div>
+      <h3 class="mt-2 text-lg font-semibold">{{ template.nome }}</h3>
+      <p class="mt-2 text-sm text-slate-600">
+        {{ template.descricao or 'Template pronto para cadastro.' }}
+      </p>
+      <a class="btn-primary mt-4 inline-flex" href="{{ url_path('/fichas/nova') }}?template_id={{ template.id }}">
+        Usar
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="mt-4 card p-5 text-sm text-slate-600">
+    Nenhum template ativo no momento. {% if user.is_admin %}Cadastre um novo template para disponibilizar aqui.{% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<section class="mt-10 card p-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-semibold">Ultimas fichas</h2>
+      <p class="mt-1 text-sm text-slate-600">Retome rapidamente as fichas mais recentes.</p>
+    </div>
+    <a class="btn-secondary" href="{{ url_path('/fichas') }}">Ver todas</a>
+  </div>
+  {% if recent_fichas %}
+  <div class="mt-4 overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <thead class="bg-slate-50 text-left">
+        <tr>
+          <th class="px-4 py-3">Processo</th>
+          <th class="px-4 py-3">Template</th>
+          <th class="px-4 py-3">Status</th>
+          <th class="px-4 py-3">Criada em</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+        {% for ficha in recent_fichas %}
+        <tr>
+          <td class="px-4 py-3 font-medium">{{ process_label(ficha.process) }}</td>
+          <td class="px-4 py-3">{{ ficha.template.nome }} v{{ ficha.template.versao }}</td>
+          <td class="px-4 py-3">{{ ficha.status }}</td>
+          <td class="px-4 py-3">{{ ficha.created_at|format_datetime }}</td>
+          <td class="px-4 py-3 text-right">
+            <a class="btn-secondary" href="{{ url_path('/fichas/' ~ ficha.id) }}">Abrir</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-4 text-sm text-slate-600">Ainda nao ha fichas cadastradas.</p>
+  {% endif %}
+</section>
 {% endblock %}
