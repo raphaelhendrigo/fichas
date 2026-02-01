@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card p-6 md:p-10">
+  <div class="flex flex-col gap-6">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-slate-500">Importacao</p>
+      <h1 class="mt-2 text-3xl font-semibold md:text-4xl">Importar ficha (foto/PDF)</h1>
+      <p class="mt-3 text-sm text-slate-600 md:text-base">
+        Envie uma foto ou PDF para preencher os campos automaticamente. Voce revisa tudo antes de salvar.
+      </p>
+    </div>
+
+    {% if error %}
+    <div class="card border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form class="grid gap-6" method="post" enctype="multipart/form-data">
+      {% if templates_list %}
+      <div>
+        <label class="text-sm font-medium">Template (opcional)</label>
+        <select class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" name="template_id">
+          <option value="">Selecione</option>
+          {% for t in templates_list %}
+          <option value="{{ t.id }}">{{ t.nome }} v{{ t.versao }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="card flex cursor-pointer flex-col gap-2 border border-slate-200 bg-white p-4">
+          <span class="text-sm font-semibold">Upload (PC)</span>
+          <span class="text-xs text-slate-500">PDF ou imagem</span>
+          <input class="mt-2" type="file" name="upload_file" accept="image/*,application/pdf" />
+        </label>
+        <label class="card flex cursor-pointer flex-col gap-2 border border-slate-200 bg-white p-4">
+          <span class="text-sm font-semibold">Tirar foto (celular)</span>
+          <span class="text-xs text-slate-500">Usa a camera do navegador</span>
+          <input class="mt-2" type="file" name="camera_file" accept="image/*" capture="environment" />
+        </label>
+      </div>
+
+      <div class="card border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        Dica: fotografe com boa luz, ficha inteira, sem sombras e com foco nitido.
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        <button class="btn-primary btn-primary-lg" type="submit">Enviar para OCR</button>
+        <a class="btn-secondary" href="{{ url_path('/') }}">Voltar ao dashboard</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     STORAGE_BACKEND: str = "local"
     LOCAL_STORAGE_PATH: str = "./data/uploads"
     GCS_BUCKET: str | None = None
+    OCR_UPLOAD_DIR: str = "./data/ocr_uploads"
+    MAX_UPLOAD_MB: int = 10
+    REDIS_URL: str = "redis://redis:6379/0"
+    OCR_LANG: str = "pt"
 
     ADMIN_SEED_EMAIL: str = "admin@tcm.sp.gov.br"
     ADMIN_SEED_PASSWORD: str = "admin123"

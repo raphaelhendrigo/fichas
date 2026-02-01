@@ -118,6 +118,7 @@
               <a class="nav-link" href="{{ url_path('/') }}">Dashboard</a>
               <a class="nav-link" href="{{ url_path('/processos') }}">Processos</a>
               <a class="nav-link" href="{{ url_path('/fichas') }}">Fichas</a>
+              <a class="nav-link" href="{{ url_path('/fichas/importar') }}">Importar</a>
               {% if user is defined and user and user.is_admin %}
               <a class="nav-link" href="{{ url_path('/admin/templates') }}">Templates</a>
               {% endif %}

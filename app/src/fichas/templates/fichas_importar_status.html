@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card p-6 md:p-10">
+  <div class="flex flex-col gap-6">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-slate-500">Importacao</p>
+      <h1 class="mt-2 text-2xl font-semibold md:text-3xl">Processando OCR</h1>
+      <p class="mt-3 text-sm text-slate-600">
+        Estamos lendo seu arquivo. Isso pode levar alguns segundos.
+      </p>
+    </div>
+    <div
+      id="ocr-status"
+      hx-get="{{ url_path('/fichas/importar/' ~ job.id ~ '/status') }}"
+      hx-trigger="load, every 1s"
+      hx-target="#ocr-status"
+      hx-swap="innerHTML"
+    ></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% if processos %}
+<div class="card overflow-hidden">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50 text-left">
+      <tr>
+        <th class="px-4 py-3">Processo</th>
+        <th class="px-4 py-3">Interessado</th>
+        <th class="px-4 py-3">Assunto</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 bg-white">
+      {% for processo in processos %}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{ process_label(processo) }}</td>
+        <td class="px-4 py-3">{{ processo.interessado or '-' }}</td>
+        <td class="px-4 py-3">{{ processo.assunto or '-' }}</td>
+        <td class="px-4 py-3 text-right">
+          <a
+            class="btn-secondary"
+            href="{{ url_path('/fichas/importar/' ~ job.id ~ '/revisar') }}?process_id={{ processo.id }}{% if template_id %}&template_id={{ template_id }}{% endif %}"
+          >Selecionar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card p-5 text-sm text-slate-600">Nenhum processo encontrado.</div>
+{% endif %}
+
+<div class="mt-4 flex items-center justify-between text-sm">
+  <div class="text-slate-600">Mostrando {{ pagination.start }}-{{ pagination.end }} de {{ pagination.total }}</div>
+  <div class="flex items-center gap-2">
+    {% if pagination.has_prev %}
+    <a
+      class="btn-secondary"
+      href="?{{ build_query(request.query_params, page=pagination.page-1, template_id=template_id) }}"
+      hx-get="?{{ build_query(request.query_params, page=pagination.page-1, template_id=template_id) }}"
+      hx-target="#processo-results"
+    >Anterior</a>
+    {% else %}
+    <span class="btn-secondary opacity-50">Anterior</span>
+    {% endif %}
+    <span class="px-3 text-slate-500">Pagina {{ pagination.page }} de {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+    <a
+      class="btn-secondary"
+      href="?{{ build_query(request.query_params, page=pagination.page+1, template_id=template_id) }}"
+      hx-get="?{{ build_query(request.query_params, page=pagination.page+1, template_id=template_id) }}"
+      hx-target="#processo-results"
+    >Proxima</a>
+    {% else %}
+    <span class="btn-secondary opacity-50">Proxima</span>
+    {% endif %}
+  </div>
+</div>

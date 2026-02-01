@@ -155,6 +155,41 @@ class Attachment(Base):
     ficha = relationship("Ficha", back_populates="attachments")
 
 
+class UploadedDocument(Base):
+    __tablename__ = "uploaded_documents"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    content_type = Column(String(100), nullable=False)
+    storage_path = Column(String(512), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User")
+    ocr_jobs = relationship("OcrJob", back_populates="document", cascade="all, delete-orphan")
+
+
+class OcrJob(Base):
+    __tablename__ = "ocr_jobs"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    template_id = Column(GUID(), ForeignKey("ficha_templates.id"), nullable=True)
+    document_id = Column(GUID(), ForeignKey("uploaded_documents.id"), nullable=False)
+    status = Column(String(20), nullable=False, default="queued")
+    extracted_text = Column(Text, nullable=True)
+    ocr_raw_json = Column(JSONType, nullable=True)
+    field_suggestions_json = Column(JSONType, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User")
+    template = relationship("FichaTemplate")
+    document = relationship("UploadedDocument", back_populates="ocr_jobs")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
@@ -178,3 +213,7 @@ Index("ix_fichas_process_id", Ficha.process_id)
 Index("ix_fichas_template_id", Ficha.template_id)
 Index("ix_fichas_indexador", Ficha.indexador)
 Index("ix_fichas_status", Ficha.status)
+Index("ix_uploaded_documents_user_id", UploadedDocument.user_id)
+Index("ix_ocr_jobs_user_id", OcrJob.user_id)
+Index("ix_ocr_jobs_status", OcrJob.status)
+Index("ix_ocr_jobs_created_at", OcrJob.created_at)

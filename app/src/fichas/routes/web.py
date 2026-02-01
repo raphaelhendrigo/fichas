@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -21,7 +21,7 @@ from fichas.auth import (
     get_current_user_optional,
 )
 from fichas.db import get_db
-from fichas.models import Attachment, Ficha, FichaTemplate, Process
+from fichas.models import Attachment, Ficha, FichaTemplate, OcrJob, Process, UploadedDocument
 from fichas.schemas import (
     FichaBaseForm,
     LoginForm,
@@ -49,6 +49,8 @@ from fichas.services.templates_service import (
     list_templates,
     set_template_active,
 )
+from fichas.services.queue import enqueue_process_ocr
+from fichas.services.storage import resolve_upload_path, save_upload
 from fichas.settings import settings
 from fichas.storage import get_storage_backend
 
@@ -136,6 +138,13 @@ def build_pagination(page: int, page_size: int, total: int) -> dict[str, int | b
         "start": start,
         "end": end,
     }
+
+
+def get_ocr_job(db: Session, job_id: str, user) -> OcrJob | None:
+    return (
+        db.execute(select(OcrJob).where(OcrJob.id == job_id, OcrJob.user_id == user.id))
+        .scalar_one_or_none()
+    )
 
 
 def get_or_create_manual_template(db: Session, user) -> FichaTemplate:
@@ -400,6 +409,285 @@ def fichas_list(request: Request, db: Session = Depends(get_db)):
             "templates_list": templates_list,
         },
     )
+
+
+@router.get("/fichas/importar")
+def fichas_importar(request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    templates_list = list_templates(db, active_only=True)
+    return templates.TemplateResponse(
+        "fichas_importar.html",
+        {
+            "request": request,
+            "user": user,
+            "templates_list": templates_list,
+            "error": None,
+        },
+    )
+
+
+@router.post("/fichas/importar")
+async def fichas_importar_submit(request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    form = await request.form()
+    template_id = str(form.get("template_id") or "").strip() or None
+    upload = form.get("upload_file") or form.get("camera_file")
+    templates_list = list_templates(db, active_only=True)
+
+    template = get_template(db, template_id) if template_id else None
+    if template_id and not template:
+        return templates.TemplateResponse(
+            "fichas_importar.html",
+            {
+                "request": request,
+                "user": user,
+                "templates_list": templates_list,
+                "error": "Template invalido.",
+            },
+            status_code=400,
+        )
+
+    if not isinstance(upload, UploadFile):
+        return templates.TemplateResponse(
+            "fichas_importar.html",
+            {
+                "request": request,
+                "user": user,
+                "templates_list": templates_list,
+                "error": "Envie um arquivo para importacao.",
+            },
+            status_code=400,
+        )
+
+    try:
+        document = save_upload(upload, user.id, db)
+    except ValueError as exc:
+        return templates.TemplateResponse(
+            "fichas_importar.html",
+            {
+                "request": request,
+                "user": user,
+                "templates_list": templates_list,
+                "error": str(exc),
+            },
+            status_code=400,
+        )
+
+    job = OcrJob(
+        user_id=user.id,
+        template_id=template.id if template else None,
+        document_id=document.id,
+        status="queued",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    enqueue_process_ocr(str(job.id))
+    return RedirectResponse(with_prefix(f"/fichas/importar/{job.id}"), status_code=303)
+
+
+@router.get("/fichas/importar/{job_id}")
+def fichas_importar_status(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return RedirectResponse(with_prefix("/"), status_code=303)
+    return templates.TemplateResponse(
+        "fichas_importar_status.html",
+        {"request": request, "user": user, "job": job},
+    )
+
+
+@router.get("/fichas/importar/{job_id}/status")
+def fichas_importar_status_poll(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return Response(status_code=404)
+    if job.status == "done":
+        return Response(status_code=200, headers={"HX-Redirect": with_prefix(f"/fichas/importar/{job.id}/revisar")})
+    if job.status == "failed":
+        return templates.TemplateResponse(
+            "partials/ocr_status.html",
+            {"request": request, "job": job, "state": "failed"},
+        )
+    return templates.TemplateResponse(
+        "partials/ocr_status.html",
+        {"request": request, "job": job, "state": "processing"},
+    )
+
+
+@router.get("/fichas/importar/{job_id}/revisar")
+def fichas_importar_revisar(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return RedirectResponse(with_prefix("/"), status_code=303)
+    if job.status != "done":
+        return RedirectResponse(with_prefix(f"/fichas/importar/{job.id}"), status_code=303)
+
+    template_id = request.query_params.get("template_id") or (str(job.template_id) if job.template_id else None)
+    template = get_template(db, template_id) if template_id else None
+    templates_list = list_templates(db, active_only=True)
+    template_schema = normalize_template_schema(template.schema_json) if template else None
+
+    process_id = request.query_params.get("process_id")
+    processo = get_process(db, process_id) if process_id else None
+
+    suggestions = job.field_suggestions_json or {"base": {}, "extras": {}}
+    return templates.TemplateResponse(
+        "fichas_importar_revisar.html",
+        {
+            "request": request,
+            "user": user,
+            "job": job,
+            "document": db.execute(select(UploadedDocument).where(UploadedDocument.id == job.document_id)).scalar_one(),
+            "template": template,
+            "templates_list": templates_list,
+            "template_schema": template_schema,
+            "processo": processo,
+            "base_suggestions": suggestions.get("base", {}),
+            "extras_suggestions": suggestions.get("extras", {}),
+            "form": {},
+            "errors": {},
+        },
+    )
+
+
+@router.get("/fichas/importar/{job_id}/processos")
+def fichas_importar_processos(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return Response(status_code=404)
+
+    page = int(request.query_params.get("page", "1"))
+    page_size = int(request.query_params.get("page_size", 6))
+    filters = {
+        "numero": request.query_params.get("numero"),
+        "ano": request.query_params.get("ano"),
+        "interessado": request.query_params.get("interessado"),
+        "assunto": request.query_params.get("assunto"),
+    }
+    processos, total = list_processes(db, filters, page, page_size)
+    pagination = build_pagination(page, page_size, total)
+    return templates.TemplateResponse(
+        "partials/import_processos_table.html",
+        {
+            "request": request,
+            "job": job,
+            "processos": processos,
+            "pagination": pagination,
+            "template_id": request.query_params.get("template_id"),
+        },
+    )
+
+
+@router.get("/fichas/importar/{job_id}/arquivo")
+def fichas_importar_arquivo(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return RedirectResponse(with_prefix("/"), status_code=303)
+    document = db.execute(select(UploadedDocument).where(UploadedDocument.id == job.document_id)).scalar_one()
+    file_path = resolve_upload_path(document.storage_path)
+    return FileResponse(file_path, media_type=document.content_type, filename=document.original_filename)
+
+
+@router.post("/fichas/importar/{job_id}/confirmar")
+async def fichas_importar_confirmar(job_id: str, request: Request, db: Session = Depends(get_db)):
+    user = ensure_user(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    job = get_ocr_job(db, job_id, user)
+    if not job:
+        return RedirectResponse(with_prefix("/"), status_code=303)
+    if job.status != "done":
+        return RedirectResponse(with_prefix(f"/fichas/importar/{job.id}"), status_code=303)
+
+    form = await request.form()
+    form_data = dict(form)
+    template_id = form_data.get("template_id") or (str(job.template_id) if job.template_id else None)
+    template = get_template(db, template_id) if template_id else None
+    templates_list = list_templates(db, active_only=True)
+    template_schema = normalize_template_schema(template.schema_json) if template else None
+
+    process_id = form_data.get("process_id")
+    processo = get_process(db, process_id) if process_id else None
+    if process_id and not processo:
+        errors["process_id"] = "Processo invalido"
+
+    suggestions = job.field_suggestions_json or {"base": {}, "extras": {}}
+    errors: dict[str, str] = {}
+
+    status_value = str(form_data.get("status") or "ativo").strip().lower()
+    if status_value not in {"ativo", "rascunho", "arquivado"}:
+        errors["status"] = "Status invalido"
+    if not template:
+        errors["template_id"] = "Template invalido"
+
+    base_fields = None
+    try:
+        base_fields = FichaBaseForm.model_validate(form_data)
+    except ValidationError as exc:
+        errors.update(validation_errors_to_dict(exc))
+
+    extras_json: dict[str, Any] = {}
+    if template_schema:
+        extras_json, extra_errors = parse_extras(form_data, template_schema)
+        for key, value in extra_errors.items():
+            errors[f"extra__{key}"] = value
+
+    if errors:
+        return templates.TemplateResponse(
+            "fichas_importar_revisar.html",
+            {
+                "request": request,
+                "user": user,
+                "job": job,
+                "document": db.execute(select(UploadedDocument).where(UploadedDocument.id == job.document_id)).scalar_one(),
+                "template": template,
+                "templates_list": templates_list,
+                "template_schema": template_schema,
+                "processo": processo,
+                "base_suggestions": suggestions.get("base", {}),
+                "extras_suggestions": suggestions.get("extras", {}),
+                "form": form_data,
+                "errors": errors,
+            },
+            status_code=400,
+        )
+
+    if not processo:
+        processo = create_process(db, base_fields.model_dump(), user)
+
+    ficha = create_ficha(
+        db,
+        processo,
+        template,
+        base_fields.model_dump(),
+        extras_json,
+        form_data.get("indexador"),
+        form_data.get("observacoes"),
+        status_value,
+        user,
+    )
+    return RedirectResponse(with_prefix(f"/fichas/{ficha.id}"), status_code=303)
 
 
 @router.get("/fichas/nova")
