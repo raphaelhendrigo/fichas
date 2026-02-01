@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -451,7 +452,7 @@ async def fichas_importar_submit(request: Request, db: Session = Depends(get_db)
             status_code=400,
         )
 
-    if not isinstance(upload, UploadFile):
+    if not isinstance(upload, StarletteUploadFile):
         return templates.TemplateResponse(
             "fichas_importar.html",
             {
