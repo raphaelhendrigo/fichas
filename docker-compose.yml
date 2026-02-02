@@ -32,6 +32,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./templates_draft:/app/templates_draft
+      - ./.secrets:/app/.secrets:ro
     depends_on:
       db:
         condition: service_healthy
@@ -112,6 +113,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./templates_draft:/app/templates_draft
+      - ./.secrets:/app/.secrets:ro
     depends_on:
       db:
         condition: service_healthy

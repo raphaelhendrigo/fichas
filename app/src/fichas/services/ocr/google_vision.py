@@ -244,10 +244,6 @@ def extract_from_pdf_bytes(
         }
         if image_context is not None:
             request_kwargs["image_context"] = image_context
-        if max_pages:
-            max_pages = int(max_pages)
-            request_kwargs["pages"] = list(range(1, max_pages + 1))
-
         async_request = vision.AsyncAnnotateFileRequest(**request_kwargs)
 
         def _call():
@@ -262,6 +258,8 @@ def extract_from_pdf_bytes(
                 continue
             payload = json.loads(blob.download_as_bytes())
             responses.extend(payload.get("responses", []))
+        if max_pages:
+            responses = responses[: int(max_pages)]
 
         texts: list[str] = []
         items: list[dict[str, Any]] = []
