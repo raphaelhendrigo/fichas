@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -514,6 +514,14 @@ def fichas_importar_status_poll(job_id: str, request: Request, db: Session = Dep
     job = get_ocr_job(db, job_id, user)
     if not job:
         return Response(status_code=404)
+    if job.status == "processing" and job.started_at:
+        timeout = int(settings.OCR_TIMEOUT_SECONDS) + 120
+        if datetime.now(timezone.utc) - job.started_at > timedelta(seconds=timeout):
+            job.status = "failed"
+            job.error_message = "OCR expirou ou foi interrompido. Reenvie o arquivo."
+            job.finished_at = datetime.now(timezone.utc)
+            db.add(job)
+            db.commit()
     if job.status == "done":
         return Response(status_code=200, headers={"HX-Redirect": with_prefix(f"/fichas/importar/{job.id}/revisar")})
     if job.status == "failed":
