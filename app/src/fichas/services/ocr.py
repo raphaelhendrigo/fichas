@@ -90,16 +90,45 @@ def _get_ocr_engine():
 
 def run_paddle_ocr(image: np.ndarray) -> list[dict[str, Any]]:
     ocr = _get_ocr_engine()
-    result = ocr.ocr(image, cls=True)
+    try:
+        result = ocr.ocr(image, cls=True)
+    except TypeError as exc:
+        if "cls" not in str(exc):
+            raise
+        result = ocr.ocr(image)
     items: list[dict[str, Any]] = []
     if not result:
         return items
-    for line in result[0]:
-        text = line[1][0]
+    lines: list[Any] = []
+    if isinstance(result, (list, tuple)) and result:
+        first = result[0]
+        if _looks_like_line(first):
+            lines = list(result)
+        else:
+            for group in result:
+                if not group:
+                    continue
+                if _looks_like_line(group):
+                    lines.append(group)
+                elif isinstance(group, (list, tuple)) and group and _looks_like_line(group[0]):
+                    lines.extend(group)
+    for line in lines:
+        if not _looks_like_line(line):
+            continue
+        text = str(line[1][0])
         conf = float(line[1][1])
         bbox = line[0]
         items.append({"text": text, "confidence": conf, "bbox": bbox})
     return items
+
+
+def _looks_like_line(item: Any) -> bool:
+    if not isinstance(item, (list, tuple)) or len(item) < 2:
+        return False
+    box, meta = item[0], item[1]
+    if not isinstance(meta, (list, tuple)) or len(meta) < 2:
+        return False
+    return isinstance(meta[0], (str, bytes))
 
 
 def build_ocr_result(ocr_items: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
