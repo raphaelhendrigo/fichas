@@ -90,6 +90,10 @@ def _get_ocr_engine():
 
 def run_paddle_ocr(image: np.ndarray) -> list[dict[str, Any]]:
     ocr = _get_ocr_engine()
+    if not isinstance(image, np.ndarray):
+        image = np.array(image)
+    image = _ensure_color_image(image)
+    image = np.ascontiguousarray(image)
     try:
         result = ocr.ocr(image, cls=True)
     except TypeError as exc:
@@ -129,6 +133,17 @@ def _looks_like_line(item: Any) -> bool:
     if not isinstance(meta, (list, tuple)) or len(meta) < 2:
         return False
     return isinstance(meta[0], (str, bytes))
+
+
+def _ensure_color_image(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 2:
+        return np.stack([image, image, image], axis=-1)
+    if image.ndim == 3:
+        if image.shape[2] == 1:
+            return np.repeat(image, 3, axis=2)
+        if image.shape[2] >= 3:
+            return image[:, :, :3]
+    return image
 
 
 def build_ocr_result(ocr_items: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
