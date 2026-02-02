@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -82,9 +84,37 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
 def _get_ocr_engine():
     global _OCR_ENGINE
     if _OCR_ENGINE is None:
+        os.environ.setdefault("FLAGS_use_mkldnn", "0")
+        os.environ.setdefault("FLAGS_enable_mkldnn", "0")
+        os.environ.setdefault("PADDLE_DISABLE_ONEDNN", "1")
+        os.environ.setdefault("FLAGS_enable_pir_api", "0")
+        os.environ.setdefault("FLAGS_use_pir_api", "0")
+        import paddle
         from paddleocr import PaddleOCR
-
-        _OCR_ENGINE = PaddleOCR(use_angle_cls=True, lang=settings.OCR_LANG)
+        kwargs: dict[str, Any] = {"lang": settings.OCR_LANG}
+        params = inspect.signature(PaddleOCR.__init__).parameters
+        supports_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
+        if supports_kwargs:
+            kwargs["enable_mkldnn"] = False
+            kwargs["device"] = "cpu"
+        for flag, value in (
+            ("FLAGS_use_mkldnn", False),
+            ("FLAGS_enable_pir_api", False),
+            ("FLAGS_use_pir_api", False),
+        ):
+            try:
+                paddle.set_flags({flag: value})
+            except Exception:
+                continue
+        if "use_doc_unwarping" in params:
+            kwargs["use_doc_unwarping"] = False
+        if "use_doc_orientation_classify" in params:
+            kwargs["use_doc_orientation_classify"] = False
+        if "use_textline_orientation" in params:
+            kwargs["use_textline_orientation"] = True
+        if "use_angle_cls" in params:
+            kwargs["use_angle_cls"] = True
+        _OCR_ENGINE = PaddleOCR(**kwargs)
     return _OCR_ENGINE
 
 
