@@ -10,6 +10,7 @@ param(
   [string]$DbPassword = $env:DB_PASSWORD,
   [string]$SecretKey = $env:SECRET_KEY,
   [string]$GcsBucket = $env:GCS_BUCKET,
+  [string]$GcsOcrBucket = $env:GCS_OCR_BUCKET,
   [string]$AdminSeedEmail = $env:ADMIN_SEED_EMAIL,
   [string]$AdminSeedPassword = $env:ADMIN_SEED_PASSWORD
 )
@@ -29,6 +30,7 @@ if (-not $GcsBucket) {
   Write-Error "GcsBucket obrigatorio para storage no GCP. Use -GcsBucket ou defina GCS_BUCKET."
   exit 1
 }
+if (-not $GcsOcrBucket) { $GcsOcrBucket = $GcsBucket }
 
 gcloud config set project $ProjectId
 gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
@@ -54,6 +56,12 @@ gcloud storage buckets describe "gs://$GcsBucket" 2>$null
 if ($LASTEXITCODE -ne 0) {
   gcloud storage buckets create "gs://$GcsBucket" --location=$Region
 }
+if ($GcsOcrBucket -ne $GcsBucket) {
+  gcloud storage buckets describe "gs://$GcsOcrBucket" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    gcloud storage buckets create "gs://$GcsOcrBucket" --location=$Region
+  }
+}
 
 $connectionName = gcloud sql instances describe $InstanceName --format="value(connectionName)"
 $databaseUrl = "postgresql+psycopg://${DbUser}:${DbPassword}@/${DbName}?host=/cloudsql/${connectionName}"
@@ -64,6 +72,6 @@ gcloud run deploy $ServiceName `
   --region $Region `
   --allow-unauthenticated `
   --add-cloudsql-instances $connectionName `
-  --set-env-vars "DATABASE_URL=$databaseUrl,SECRET_KEY=$SecretKey,STORAGE_BACKEND=gcs,GCS_BUCKET=$GcsBucket,ADMIN_SEED_EMAIL=$AdminSeedEmail,ADMIN_SEED_PASSWORD=$AdminSeedPassword"
+  --set-env-vars "DATABASE_URL=$databaseUrl,SECRET_KEY=$SecretKey,STORAGE_BACKEND=gcs,GCS_BUCKET=$GcsBucket,GCP_OCR_PROVIDER=google_vision,GCS_OCR_BUCKET=$GcsOcrBucket,OCR_LANGUAGE_HINTS=pt,ADMIN_SEED_EMAIL=$AdminSeedEmail,ADMIN_SEED_PASSWORD=$AdminSeedPassword"
 
 Write-Host "Deploy concluido. Rode migrations e seed via Cloud SQL Auth Proxy."

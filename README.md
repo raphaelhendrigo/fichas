@@ -66,6 +66,30 @@ docker compose exec app python scripts/seed_admin_and_templates.py
 ## Tests
 docker compose exec app pytest
 
+### OCR integration tests (opcional)
+Rodam apenas quando `RUN_GCP_INTEGRATION_TESTS=1` e credenciais estao disponiveis.
+Exemplo (local):
+```
+$env:RUN_GCP_INTEGRATION_TESTS="1"
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\\caminho\\service-account.json"
+$env:GCS_OCR_BUCKET="seu-bucket"
+docker compose exec app pytest -k integration
+```
+
+## OCR (Google Cloud Vision)
+Este projeto usa o Google Vision API para OCR (imagens e PDFs).
+
+Requisitos no GCP:
+- Vision API habilitada
+- Storage API habilitada
+- Service Account com permissao de Vision + Storage (roles `roles/vision.user` e `roles/storage.objectAdmin`)
+
+Variaveis importantes (ver `.env.example`):
+- `GCP_OCR_PROVIDER=google_vision`
+- `GCS_OCR_BUCKET` (obrigatorio para OCR de PDF/TIFF)
+- `OCR_LANGUAGE_HINTS=pt` (pode incluir mais, ex.: `pt,en`)
+- `GOOGLE_APPLICATION_CREDENTIALS` (apenas local, apontando para o JSON da service account)
+
 ## Hospedagem local com HTTPS
 Veja `README_LOCAL.md` para Nginx + HTTPS e Cloudflare Tunnel.
 
@@ -75,6 +99,14 @@ Veja `README_LOCAL.md` para Nginx + HTTPS e Cloudflare Tunnel.
 - STORAGE_BACKEND=local|gcs
 - LOCAL_STORAGE_PATH=./data/uploads
 - GCS_BUCKET=nome-do-bucket
+- GCP_OCR_PROVIDER=google_vision
+- GCP_PROJECT_ID=...
+- GCP_REGION=...
+- GCS_OCR_BUCKET=...
+- OCR_MAX_PAGES=10
+- OCR_TIMEOUT_SECONDS=180
+- OCR_RETRY=2
+- OCR_LANGUAGE_HINTS=pt
 - ADMIN_SEED_EMAIL=...
 - ADMIN_SEED_PASSWORD=...
 - APP_BASE_PATH=/fichas (ou vazio)
@@ -88,6 +120,7 @@ Requisitos: gcloud instalado e logado, projeto ativo, billing habilitado.
 2) Execute o script de deploy (exemplo):
    .\deploy.ps1 -ProjectId <seu-projeto> -Region us-central1 -GcsBucket <bucket>
    O script cria/ajusta Cloud SQL, bucket (se informado) e faz deploy no Cloud Run.
+   Para OCR de PDF, use o mesmo bucket ou configure `GCS_OCR_BUCKET`.
 
 3) Rode migrations e seed via Cloud SQL Auth Proxy:
    gcloud sql instances describe fichas-postgres --format="value(connectionName)"
