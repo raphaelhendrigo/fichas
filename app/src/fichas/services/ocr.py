@@ -84,7 +84,7 @@ def _get_ocr_engine():
     if _OCR_ENGINE is None:
         from paddleocr import PaddleOCR
 
-        _OCR_ENGINE = PaddleOCR(use_angle_cls=True, lang=settings.OCR_LANG, show_log=False)
+        _OCR_ENGINE = PaddleOCR(use_angle_cls=True, lang=settings.OCR_LANG)
     return _OCR_ENGINE
 
 

@@ -11,14 +11,34 @@ from fichas.models import UploadedDocument
 from fichas.settings import settings
 
 ALLOWED_CONTENT_TYPES = {"application/pdf"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+}
 
 
-def _is_allowed(content_type: str | None) -> bool:
-    if not content_type:
-        return False
-    if content_type in ALLOWED_CONTENT_TYPES:
+def _is_allowed(content_type: str | None, filename: str | None) -> bool:
+    if content_type:
+        if content_type in ALLOWED_CONTENT_TYPES or content_type.startswith("image/"):
+            return True
+        if content_type not in {"application/octet-stream", "binary/octet-stream"}:
+            return False
+
+    ext = Path(filename or "").suffix.lower()
+    if ext in ALLOWED_EXTENSIONS:
         return True
-    return content_type.startswith("image/")
+    guessed, _ = mimetypes.guess_type(filename or "")
+    if guessed:
+        return guessed in ALLOWED_CONTENT_TYPES or guessed.startswith("image/")
+    return False
 
 
 def _safe_extension(filename: str | None, content_type: str | None) -> str:
@@ -35,7 +55,7 @@ def _ensure_dir(path: Path) -> None:
 
 def save_upload(upload: UploadFile, user_id, db: Session) -> UploadedDocument:
     content_type = (upload.content_type or "").lower()
-    if not _is_allowed(content_type):
+    if not _is_allowed(content_type, upload.filename):
         raise ValueError("Tipo de arquivo nao permitido.")
 
     max_bytes = int(settings.MAX_UPLOAD_MB) * 1024 * 1024
