@@ -14,4 +14,5 @@ def enqueue_process_ocr(job_id: str):
     from fichas.workers.ocr_worker import process_ocr_job
 
     queue = get_queue()
-    return queue.enqueue(process_ocr_job, job_id, job_timeout=600)
+    timeout = max(600, int(settings.OCR_TIMEOUT_SECONDS) + 120)
+    return queue.enqueue(process_ocr_job, job_id, job_timeout=timeout)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 from datetime import datetime
 
 from sqlalchemy import select
@@ -7,14 +8,8 @@ from sqlalchemy import select
 from fichas.db import SessionLocal
 from fichas.models import FichaTemplate, OcrJob, UploadedDocument
 from fichas.schemas import normalize_template_schema
-from fichas.services.ocr import (
-    build_ocr_result,
-    detect_file_type,
-    extract_text_from_pdf,
-    map_fields_to_ficha,
-    preprocess_image,
-    run_paddle_ocr,
-)
+from fichas.services.ocr import map_fields_to_ficha
+from fichas.services.ocr.provider import ocr_extract
 from fichas.services.storage import resolve_upload_path
 
 
@@ -34,30 +29,18 @@ def process_ocr_job(job_id: str) -> None:
         document = db.execute(select(UploadedDocument).where(UploadedDocument.id == job.document_id)).scalar_one()
         file_path = resolve_upload_path(document.storage_path)
 
-        extracted_text = ""
-        ocr_items: list[dict[str, object]] = []
+        with file_path.open("rb") as handle:
+            file_bytes = handle.read()
 
-        if detect_file_type(file_path) == "pdf":
-            extracted_text, images = extract_text_from_pdf(file_path)
-            if images:
-                for image in images[:1]:
-                    processed = preprocess_image(image)
-                    ocr_items.extend(run_paddle_ocr(processed))
-        else:
-            from PIL import Image
+        mime_type = (document.content_type or "").lower()
+        if not mime_type or mime_type in {"application/octet-stream", "binary/octet-stream"}:
+            guessed, _ = mimetypes.guess_type(document.original_filename or file_path.name)
+            if guessed:
+                mime_type = guessed
 
-            image = Image.open(file_path)
-            processed = preprocess_image(image)
-            ocr_items = run_paddle_ocr(processed)
-
-        if extracted_text and not ocr_items:
-            ocr_items = [
-                {"text": line, "confidence": 1.0, "bbox": None}
-                for line in extracted_text.splitlines()
-                if line.strip()
-            ]
-
-        extracted_text, ocr_items = build_ocr_result(ocr_items)
+        ocr_result = ocr_extract(file_bytes, mime_type, document.original_filename)
+        extracted_text = ocr_result.text
+        ocr_items = ocr_result.items
         if extracted_text and len(extracted_text) > 30000:
             extracted_text = extracted_text[:30000]
 
@@ -71,7 +54,11 @@ def process_ocr_job(job_id: str) -> None:
 
         job.status = "done"
         job.extracted_text = extracted_text
-        job.ocr_raw_json = ocr_items
+        job.ocr_raw_json = {
+            "provider": "google_vision",
+            "items": ocr_items,
+            "raw": ocr_result.raw or {},
+        }
         job.field_suggestions_json = suggestions
         job.finished_at = datetime.utcnow()
         db.add(job)

@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     MAX_UPLOAD_MB: int = 10
     REDIS_URL: str = "redis://redis:6379/0"
     OCR_LANG: str = "pt"
+    GCP_OCR_PROVIDER: str = "google_vision"
+    GCP_PROJECT_ID: str | None = None
+    GCP_REGION: str | None = None
+    GCS_OCR_BUCKET: str | None = None
+    OCR_MAX_PAGES: int | None = 10
+    OCR_TIMEOUT_SECONDS: int = 180
+    OCR_RETRY: int = 2
+    OCR_LANGUAGE_HINTS: str | None = "pt"
 
     ADMIN_SEED_EMAIL: str = "admin@tcm.sp.gov.br"
     ADMIN_SEED_PASSWORD: str = "admin123"

@@ -1,179 +1,12 @@
 from __future__ import annotations
 
-import inspect
-import os
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-import numpy as np
-from PIL import Image
 from rapidfuzz import fuzz, process
 
 from fichas.schemas import TemplateSchema
-from fichas.settings import settings
-
-_OCR_ENGINE = None
-
-
-def detect_file_type(path: Path) -> str:
-    if path.suffix.lower() == ".pdf":
-        return "pdf"
-    return "image"
-
-
-def extract_text_from_pdf(path: Path) -> tuple[str, list[Image.Image]]:
-    from pypdf import PdfReader
-    from pdf2image import convert_from_path
-
-    reader = PdfReader(str(path))
-    extracted = []
-    for page in reader.pages:
-        text = page.extract_text() or ""
-        extracted.append(text)
-    raw_text = "\n".join(extracted).strip()
-
-    if len(raw_text) >= 40:
-        return raw_text, []
-
-    images = convert_from_path(str(path), first_page=1, last_page=1)
-    return raw_text, images
-
-
-def _deskew(gray: np.ndarray) -> np.ndarray:
-    import cv2
-
-    inverted = cv2.bitwise_not(gray)
-    coords = cv2.findNonZero(inverted)
-    if coords is None:
-        return gray
-    angle = cv2.minAreaRect(coords)[-1]
-    if angle < -45:
-        angle = -(90 + angle)
-    else:
-        angle = -angle
-    if abs(angle) < 0.5:
-        return gray
-    (height, width) = gray.shape
-    center = (width // 2, height // 2)
-    matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    return cv2.warpAffine(gray, matrix, (width, height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-
-
-def preprocess_image(image: Image.Image) -> np.ndarray:
-    import cv2
-
-    rgb = image.convert("RGB")
-    array = np.array(rgb)
-    gray = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
-    gray = _deskew(gray)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    thresh = cv2.adaptiveThreshold(
-        enhanced,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        31,
-        2,
-    )
-    return thresh
-
-
-def _get_ocr_engine():
-    global _OCR_ENGINE
-    if _OCR_ENGINE is None:
-        os.environ.setdefault("FLAGS_use_mkldnn", "0")
-        os.environ.setdefault("FLAGS_enable_mkldnn", "0")
-        os.environ.setdefault("PADDLE_DISABLE_ONEDNN", "1")
-        os.environ.setdefault("FLAGS_enable_pir_api", "0")
-        os.environ.setdefault("FLAGS_use_pir_api", "0")
-        import paddle
-        from paddleocr import PaddleOCR
-        kwargs: dict[str, Any] = {"lang": settings.OCR_LANG}
-        params = inspect.signature(PaddleOCR.__init__).parameters
-        supports_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
-        if supports_kwargs:
-            kwargs["enable_mkldnn"] = False
-            kwargs["device"] = "cpu"
-        for flag, value in (
-            ("FLAGS_use_mkldnn", False),
-            ("FLAGS_enable_pir_api", False),
-            ("FLAGS_use_pir_api", False),
-        ):
-            try:
-                paddle.set_flags({flag: value})
-            except Exception:
-                continue
-        if "use_doc_unwarping" in params:
-            kwargs["use_doc_unwarping"] = False
-        if "use_doc_orientation_classify" in params:
-            kwargs["use_doc_orientation_classify"] = False
-        if "use_textline_orientation" in params:
-            kwargs["use_textline_orientation"] = True
-        if "use_angle_cls" in params:
-            kwargs["use_angle_cls"] = True
-        _OCR_ENGINE = PaddleOCR(**kwargs)
-    return _OCR_ENGINE
-
-
-def run_paddle_ocr(image: np.ndarray) -> list[dict[str, Any]]:
-    ocr = _get_ocr_engine()
-    if not isinstance(image, np.ndarray):
-        image = np.array(image)
-    image = _ensure_color_image(image)
-    image = np.ascontiguousarray(image)
-    try:
-        result = ocr.ocr(image, cls=True)
-    except TypeError as exc:
-        if "cls" not in str(exc):
-            raise
-        result = ocr.ocr(image)
-    items: list[dict[str, Any]] = []
-    if not result:
-        return items
-    lines: list[Any] = []
-    if isinstance(result, (list, tuple)) and result:
-        first = result[0]
-        if _looks_like_line(first):
-            lines = list(result)
-        else:
-            for group in result:
-                if not group:
-                    continue
-                if _looks_like_line(group):
-                    lines.append(group)
-                elif isinstance(group, (list, tuple)) and group and _looks_like_line(group[0]):
-                    lines.extend(group)
-    for line in lines:
-        if not _looks_like_line(line):
-            continue
-        text = str(line[1][0])
-        conf = float(line[1][1])
-        bbox = line[0]
-        items.append({"text": text, "confidence": conf, "bbox": bbox})
-    return items
-
-
-def _looks_like_line(item: Any) -> bool:
-    if not isinstance(item, (list, tuple)) or len(item) < 2:
-        return False
-    box, meta = item[0], item[1]
-    if not isinstance(meta, (list, tuple)) or len(meta) < 2:
-        return False
-    return isinstance(meta[0], (str, bytes))
-
-
-def _ensure_color_image(image: np.ndarray) -> np.ndarray:
-    if image.ndim == 2:
-        return np.stack([image, image, image], axis=-1)
-    if image.ndim == 3:
-        if image.shape[2] == 1:
-            return np.repeat(image, 3, axis=2)
-        if image.shape[2] >= 3:
-            return image[:, :, :3]
-    return image
 
 
 def build_ocr_result(ocr_items: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
@@ -232,7 +65,7 @@ def _line_confidence(line: str, ocr_items: list[dict[str, Any]]) -> float:
     best = process.extractOne(line, candidates, scorer=fuzz.token_set_ratio)
     if not best:
         return 0.4
-    best_text, score, index = best
+    _best_text, score, index = best
     conf = float(ocr_items[index].get("confidence") or 0.4)
     if score < 70:
         conf *= 0.7
@@ -333,7 +166,7 @@ def _parse_value(field: str, value: str, template_fields: dict[str, str]) -> str
             lowered = value.strip().lower()
             if lowered in {"sim", "true", "1", "yes"}:
                 return "true"
-            if lowered in {"nao", "não", "false", "0", "no"}:
+            if lowered in {"nao", "false", "0", "no"}:
                 return "false"
             return None
     return value.strip() or None

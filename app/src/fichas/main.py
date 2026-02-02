@@ -12,6 +12,7 @@ from fichas.routes.api import router as api_router
 from fichas.routes.web import router as web_router
 from fichas.settings import settings
 from fichas.storage import get_storage_backend
+from fichas.services.ocr.provider import validate_ocr_config
 
 
 class JsonFormatter(logging.Formatter):
@@ -54,3 +55,8 @@ if static_dir.exists():
 def startup_init() -> None:
     if settings.STORAGE_BACKEND.lower() == "local":
         get_storage_backend()
+    try:
+        validate_ocr_config(require_bucket_for_pdf=False)
+    except ValueError as exc:
+        logging.getLogger(__name__).error("OCR config invalida: %s", exc)
+        raise RuntimeError(str(exc))
