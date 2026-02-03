@@ -41,3 +41,19 @@ def test_save_upload_enforces_size(db_session, tmp_path, monkeypatch):
     upload = _make_upload(b"1", "application/pdf", "arquivo.pdf")
     with pytest.raises(ValueError):
         save_upload(upload, user.id, db_session)
+
+
+def test_save_upload_accepts_octet_stream_image(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "OCR_UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "MAX_UPLOAD_MB", 1)
+
+    user = User(email="upload3@test.com", hashed_password=get_password_hash("secret"), is_admin=False)
+    db_session.add(user)
+    db_session.commit()
+
+    jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+    upload = _make_upload(jpeg_bytes, "application/octet-stream", "camera")
+    document = save_upload(upload, user.id, db_session)
+
+    assert document.content_type == "image/jpeg"
+    assert document.storage_path.endswith(".jpg")
