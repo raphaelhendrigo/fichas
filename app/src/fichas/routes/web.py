@@ -60,6 +60,31 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
 
+def _select_upload(form: Any) -> StarletteUploadFile | None:
+    def has_content(upload: Any) -> bool:
+        if not isinstance(upload, StarletteUploadFile):
+            return False
+        if (upload.filename or "").strip():
+            return True
+        content_type = (upload.content_type or "").lower()
+        if content_type and content_type not in {"application/octet-stream", "binary/octet-stream"}:
+            return True
+        try:
+            header = upload.file.read(1)
+            upload.file.seek(0)
+        except Exception:
+            return False
+        return bool(header)
+
+    upload_file = form.get("upload_file") if form else None
+    camera_file = form.get("camera_file") if form else None
+    if has_content(upload_file):
+        return upload_file
+    if has_content(camera_file):
+        return camera_file
+    return None
+
+
 def format_date(value):
     if not value:
         return ""
@@ -436,7 +461,7 @@ async def fichas_importar_submit(request: Request, db: Session = Depends(get_db)
         return user
     form = await request.form()
     template_id = str(form.get("template_id") or "").strip() or None
-    upload = form.get("upload_file") or form.get("camera_file")
+    upload = _select_upload(form)
     templates_list = list_templates(db, active_only=True)
 
     template = get_template(db, template_id) if template_id else None
