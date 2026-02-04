@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from fichas import __version__
@@ -708,7 +709,36 @@ async def fichas_importar_confirmar(job_id: str, request: Request, db: Session =
         )
 
     if not processo:
-        processo = create_process(db, base_fields.model_dump(), user)
+        if base_fields.process_key:
+            processo = db.execute(
+                select(Process).where(Process.process_key == base_fields.process_key)
+            ).scalar_one_or_none()
+        if not processo and base_fields.tc_numero and base_fields.ano:
+            processo = db.execute(
+                select(Process).where(
+                    Process.tc_numero == base_fields.tc_numero,
+                    Process.ano == base_fields.ano,
+                )
+            ).scalar_one_or_none()
+
+    if not processo:
+        try:
+            processo = create_process(db, base_fields.model_dump(), user)
+        except IntegrityError:
+            db.rollback()
+            if base_fields.process_key:
+                processo = db.execute(
+                    select(Process).where(Process.process_key == base_fields.process_key)
+                ).scalar_one_or_none()
+            if not processo and base_fields.tc_numero and base_fields.ano:
+                processo = db.execute(
+                    select(Process).where(
+                        Process.tc_numero == base_fields.tc_numero,
+                        Process.ano == base_fields.ano,
+                    )
+                ).scalar_one_or_none()
+            if not processo:
+                raise
 
     ficha = create_ficha(
         db,
