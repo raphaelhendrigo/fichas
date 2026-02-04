@@ -21,15 +21,7 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro field_value(name, suggestion) -%}
-  {% if form and form.get(name) is not none %}
-    {{ form.get(name) }}
-  {% elif suggestion %}
-    {{ suggestion.get('value') }}
-  {% else %}
-    {{ '' }}
-  {% endif %}
-{%- endmacro %}
+{% macro field_value(name, suggestion) -%}{{ (form.get(name) if form and form.get(name) is not none else (suggestion.get('value') if suggestion else '')) | trim }}{%- endmacro %}
 
 {% block content %}
 <div class="flex flex-col gap-6">
@@ -150,9 +142,9 @@
               {% endif %}
             </div>
             {% set suggestion = base_suggestions.get('assunto') %}
-            <div>
+            <div class="md:col-span-2">
               <label class="text-sm font-medium">Assunto {{ confidence_badge(suggestion) }}</label>
-              <input class="{{ input_class(suggestion) }}" name="assunto" value="{{ field_value('assunto', suggestion) }}" />
+              <textarea class="{{ input_class(suggestion) }}" name="assunto" rows="2" maxlength="100">{{ field_value('assunto', suggestion) }}</textarea>
               {% if errors and errors.get('assunto') %}
               <p class="text-sm text-red-600">{{ errors.get('assunto') }}</p>
               {% endif %}
