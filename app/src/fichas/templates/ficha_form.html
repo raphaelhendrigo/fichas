@@ -207,7 +207,11 @@
       </div>
       <div>
         <label class="text-sm font-medium">Assunto</label>
-        <input class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" name="assunto" value="{{ form.assunto or processo.assunto or '' }}" />
+        <textarea
+          class="mt-1 w-full resize-none rounded-xl border border-slate-200 px-3 py-2 overflow-y-auto h-24"
+          name="assunto"
+          rows="4"
+        >{{ form.assunto or processo.assunto or '' }}</textarea>
       </div>
       <div>
         <label class="text-sm font-medium">Procedencia</label>
